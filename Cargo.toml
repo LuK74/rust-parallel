@@ -1,7 +1,12 @@
 [package]
 name = "rust-parallel"
 version = "0.1.0"
-authors = ["Dorian Baret <bdepolytechgre@gmail.com>"]
+authors = [
+    "Dorian Baret <email@domaine.name>",
+    "Victor Malod <email@domaine.name>",
+    "Lucas Chaloyard <email@domaine.name>",
+    "Yael Para <email@domaine.name>",
+]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
