@@ -1,5 +1,5 @@
 [package]
-name = "rust-parallel"
+name = "rust_parallel"
 version = "0.1.0"
 authors = [
     "Dorian Baret <email@domaine.name>",

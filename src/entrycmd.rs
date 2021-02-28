@@ -1,4 +1,4 @@
-use std::io::stdin;
+use std::io::{stdin, stdout, Write};
 // use std::io::SplitWhitespace;
 
 pub fn entrymod(args: &[String]){
@@ -18,17 +18,28 @@ fn shell(){
     let mut tab = vec![];
 
     loop {
+        print!("$> ");
+        let _r = stdout().flush();
         buffer = String::new();
         match stdin.read_line(&mut buffer) {
             Ok(_line) => {
                 let tmp: Vec<String> = buffer.split_whitespace().map(String::from).collect();
+
+                // if the user puts an enter
+                // then do not consider the line 
+                if tmp.len() == 0 {
+                    continue;
+                }
+
+                // if the first word of the line is "exit"
+                // then close the terminal 
                 if tmp[0].eq("exit") {
                     break;
                 }
                 tab.push(tmp);
             }, 
             Err(e) => {
-                panic!("Error : {:?}",e);
+                println!("Error : {:?}",e);
             }
         }
     }

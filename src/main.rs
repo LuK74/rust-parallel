@@ -1,5 +1,5 @@
 use std::env;
-mod entrycmd;
+use rust_parallel::entrycmd;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
