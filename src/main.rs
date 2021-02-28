@@ -1,3 +1,8 @@
+use std::env;
+mod entrycmd;
+
 fn main() {
-    println!("Hello, world!");
+    let args: Vec<String> = env::args().collect();
+
+    entrycmd::entrymod(&args);
 }
