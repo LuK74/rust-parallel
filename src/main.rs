@@ -1,3 +1,6 @@
+use rust_parallel::*;
+
 fn main() {
-    println!("Hello, world!");
+    remote::server::test();
+    parallel::test();
 }
