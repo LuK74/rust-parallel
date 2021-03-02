@@ -1,12 +1,17 @@
 use super::job::Job;
+use tokio::runtime::{Runtime,Builder};
 
 pub struct JobManager {
-    cmds : Vec<Job>
+    cmds : Vec<Job>,
+    nb_thread : Option<usize>
 }
 
 impl JobManager {
     pub fn new() -> JobManager {
-        JobManager{cmds : vec!()}
+        JobManager{
+            cmds : vec!(),
+            nb_thread : None
+        }
     }
 
     pub fn add_job (&mut self, job : Job) {
@@ -14,8 +19,19 @@ impl JobManager {
     }
 
     pub fn exec_all(&mut self) {
-        for i in 0..self.cmds.len() {
-            self.cmds[i].exec();
-        }
+        let mut runtime_builder : Builder = Builder::new_multi_thread();
+        let runtime : Runtime = match self.nb_thread {
+            Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
+            None => runtime_builder.build().unwrap()
+        };
+
+        runtime.block_on(async {
+            println!("start block_on");
+            for i in 0..self.cmds.len() {
+                let _r = self.cmds[i]
+                    .exec();
+            }
+            println!("stop block_on");
+        });
     }
 }

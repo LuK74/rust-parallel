@@ -1,6 +1,6 @@
 extern crate tokio;
-use tokio::process::Command;
-use tokio::runtime;
+use tokio::process::{Command, Child};
+
 
 pub struct Job {
     cmd : String,
@@ -15,22 +15,24 @@ impl Job {
             parameter.push(args[i].clone());
         }
 
-        println!("job cmd : {:?}", cmd);
-
         Job {
             cmd,
             parameter
         }
     }
 
-    pub fn exec(&mut self) {
+    pub async fn exec(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("test");
         let mut command : Command = Command::new(self.cmd.clone());
         for arg in &self.parameter {
             command.arg(&arg.clone());
         }
+        
+        let mut child : Child = command.spawn().unwrap();
+        let stdout = child.stdout.take().unwrap();
 
-        runtime::Runtime::new().unwrap().block_on(async {
-            command.spawn().expect("failed to spawn");
-        });
+        println!("stderr of ls: {:?}", stdout);
+
+        Ok(())
     }
 }
