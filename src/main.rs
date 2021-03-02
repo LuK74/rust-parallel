@@ -1,17 +1,37 @@
-extern crate tokio;
-use tokio::process::Command;
+use rust_parallel::parallel::Parallel;
+use std::env;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // The usage is similar as with the standard library's `Command` type
-    let mut child = Command::new("echo")
-        .arg("hello")
-        .arg("world")
-        .spawn()
-        .expect("failed to spawn");
+fn main() {
+    let args: Vec<String> = env::args().collect();
 
-    // Await until the command completes
-    let status = child.wait().await?;
-    println!("the command exited with: {}", status);
-    Ok(())
+    let mut prg = Parallel::new();
+    prg.new_cmd(args[1..args.len()].to_vec());
+    prg.start();
 }
+
+#[test]
+fn test_echo1(){
+    let args: Vec<String> = vec![
+        String::from("echo"), 
+        String::from("Hello"),
+        String::from("World")
+    ];
+    let mut prg = Parallel::new();
+    prg.new_cmd(args);
+    prg.start();
+}
+
+#[test]
+fn test_echo2(){
+    let args: Vec<String> = vec![
+        String::from("echo"), 
+        String::from("-e"), 
+        String::from("Hello"),
+        String::from("\n"),
+        String::from("World")
+    ];
+    let mut prg = Parallel::new();
+    prg.new_cmd(args);
+    prg.start();
+}
+
