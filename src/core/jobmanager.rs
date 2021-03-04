@@ -1,9 +1,20 @@
 use super::job::Job;
+use std::fmt;
 use tokio::runtime::{Runtime,Builder};
 
 pub struct JobManager {
     cmds : Vec<Job>,
     nb_thread : Option<usize>
+}
+
+impl fmt::Display for JobManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Runtime with {:?} threads", self.nb_thread);
+        for i in 0..self.cmds.len() {
+            write!(f, "\n\t{}", self.cmds[i]);
+        }
+        Ok(())
+    }
 }
 
 impl JobManager {

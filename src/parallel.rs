@@ -18,6 +18,7 @@ impl Parallel {
     }
 
     pub fn start(&mut self) {
+        println!("{}", self.job_manager);
         self.job_manager.exec_all();
     }
 }

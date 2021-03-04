@@ -26,9 +26,7 @@ fn test_echo2(){
     let args: Vec<String> = vec![
         String::from("echo"), 
         String::from("-e"), 
-        String::from("Hello"),
-        String::from("\n"),
-        String::from("World")
+        String::from("'Hello\nWorld'"),
     ];
     let mut prg = Parallel::new();
     prg.new_cmd(args);

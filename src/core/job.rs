@@ -1,10 +1,18 @@
 extern crate tokio;
+use std::fmt;
 use tokio::process::{Command, Child};
 
 
 pub struct Job {
     cmd : String,
     parameter : Vec<String>,
+}
+
+impl fmt::Display for Job {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, r"Job : {} {}", self.cmd, self.parameter.iter().fold(String::new(), |acc, arg| acc + " " + arg));
+        Ok(())
+    }
 }
 
 impl Job {
