@@ -9,9 +9,9 @@ pub struct JobManager {
 
 impl fmt::Display for JobManager {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Runtime with {:?} threads", self.nb_thread);
+        let _r = write!(f, "Runtime with {:?} threads", self.nb_thread);
         for i in 0..self.cmds.len() {
-            write!(f, "\n\t{}", self.cmds[i]);
+            let _r = write!(f, "\n\t{}", self.cmds[i]);
         }
         Ok(())
     }

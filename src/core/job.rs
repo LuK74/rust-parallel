@@ -10,7 +10,7 @@ pub struct Job {
 
 impl fmt::Display for Job {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, r"Job : {} {}", self.cmd, self.parameter.iter().fold(String::new(), |acc, arg| acc + " " + arg));
+        let _r =  write!(f, r"Job : {} {}", self.cmd, self.parameter.iter().fold(String::new(), |acc, arg| acc + " " + arg));
         Ok(())
     }
 }
