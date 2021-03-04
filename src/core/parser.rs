@@ -2,17 +2,34 @@
     Test structure
 */
 struct InputOption {
+    //// On the left the input type like ":::"
+    //// On the right the input file or data like "1 2 3 4" for example
     m_inputData : Vec<(String, Vec<String>)>,
+
     m_currentIndex : usize,
 }
 
 impl InputOption {
-    fn add_input_data(self : &mut Self, data : String) {
-        self.m_inputData[self.m_currentIndex].1.push(data);
+    fn new() -> Self { 
+        InputOption {
+            m_inputData : Vec::new(),
+            m_currentIndex : 0,
+        }
     }
 
-    fn add_new_uplet(self : &mut Self, inputOption : String) {
-        self.m_inputData.push((inputOption, Vec::new()));
+    fn clone(self : &mut Self) -> Self {
+        InputOption {
+            m_inputData : self.m_inputData.clone(),
+            m_currentIndex : self.m_currentIndex,
+        }
+    }
+
+    fn add_input_data(self : &mut Self, data : &String) {
+        self.m_inputData[self.m_currentIndex].1.push(data.clone());
+    }
+
+    fn add_new_uplet(self : &mut Self, inputOption : &String) {
+        self.m_inputData.push((inputOption.clone(), Vec::new()));
         self.m_currentIndex += 1;
     }
 }
@@ -47,7 +64,7 @@ fn parse_number(word : String) -> Result<u32, String> {
     (the one who called this one) to rebuild the Vector
     - Right part : String, just a standard error message
 */
-fn parse_next_input(words : &mut Vec<String>, inputOption : Option<InputOption>) -> Result<InputOption, (Vec<String>, String)> {
+fn parse_next_input(words : &mut Vec<String>, inputOption : &mut Option<&mut InputOption>) -> Result<InputOption, String> {
 
     /****
      * This case need to return Ok when this parsing function
@@ -56,26 +73,37 @@ fn parse_next_input(words : &mut Vec<String>, inputOption : Option<InputOption>)
      */
     if words.len() <= 0 {
         //// don't know what to return yet
-        return Ok(());
+        if let Some(inputOpt) = inputOption {
+            return Ok(inputOpt.clone());
+        } else {
+            return Err(String::from("Something went wrong during the parsing"));
+        }
     }
 
     //// Remove we'll get the first word and remove it from the vector
-    let mut firstWord = words.remove(0);
+    let firstWord = words.remove(0);
+
+    if let Some(inputOpt) = inputOption {
+        inputOpt.add_input_data(&firstWord);
+    } else {
+        return Err(String::from("Something went wrong during the parsing"));
+    }
 
     //// First rule define in the grammar linked to this function
     let res = parse_input_option(words, inputOption);
 
     //// If the first rule failed, we can retrieve the words used in the
     //// previous function, in order to use it in the next one
-    if let Err((remaining, err)) = res {   
+    if let Err(err) = res {   
         //// Second rule define in the grammar linked to this function   
-        let res = parse_next_input(&mut remaining);
+        
+        let res = parse_next_input(words, inputOption);
         //// If the second rule fail too, we'll rebuild the vector in order to
         //// return it to the upper function
-        if let Err((remainingNext, errNext)) = res {
+        if let Err(errNext) = res {
             //// Rebuild the vector
-            remainingNext.insert(0, firstWord);
-            return Err((remainingNext, errNext));
+            words.insert(0, firstWord);
+            return Err(errNext);
         } else {
             // insert return success case
         }
@@ -84,25 +112,43 @@ fn parse_next_input(words : &mut Vec<String>, inputOption : Option<InputOption>)
     }
     
 
-    return Err(());
+    return Err(String::from("Something unexpected happened"));
 }
 
-fn parse_input_option(words : &mut Vec<String>, inputOption : Option<InputOption>) -> Result<InputOption, (Vec<String>, String)> {
+fn parse_input_option(words : &mut Vec<String>, inputOption : &mut Option<&mut InputOption>) -> Result<InputOption, String> {
     if words.len() <= 0 {
-        return Err((words.clone(), String::from("No more words to parse")));
+        return Err(String::from("No more words to parse"));
     }
 
-    let mut firstWord = words.remove(0);
+    let firstWord = words.remove(0);
+    let mut newInputOption : Option<&mut InputOption> = None;
+    let mut newInputOpt = InputOption::new();
+
+    if let Some(inputOpt) = inputOption {
+        inputOpt.add_new_uplet(&firstWord);
+    } else {
+        newInputOpt.add_new_uplet(&firstWord);
+        newInputOption = Some(&mut newInputOpt);
+    }
    
     match firstWord.as_str() {
-        ":::" => return Ok(()),
+        ":::" => {
+            let parseResult = parse_next_input(words, &mut newInputOption);
+            if let Err(err) = parseResult {
+                //// in this one we only have one rule, so we'll return the error
+                words.insert(0, firstWord);
+                return Err(err);
+            } else {
+                return parseResult;
+            }
+        }
         _ => {
             words.insert(0, firstWord);
-            return Err((*words, String::from("Couldn't parse this input option")));
+            return Err(String::from("Couldn't parse this input option"));
         },
     }
 
-    return Ok(());
+    return Err(String::from("Something unexpected happened"));
 }
 
 pub fn test(){
