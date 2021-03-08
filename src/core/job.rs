@@ -36,10 +36,10 @@ impl Job {
             command.arg(&arg.clone());
         }
         
-        let mut child : Child = command.spawn().unwrap();
-        let stdout = child.stdout.take().unwrap();
+        let mut child : Child = command.spawn()?;
+        // let stdout = child.stdout.take().unwrap();
 
-        println!("stderr of ls: {:?}", stdout);
+        // println!("stderr of {:?} : {:?}", self.cmd, stdout);
 
         Ok(())
     }

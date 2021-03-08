@@ -31,6 +31,7 @@ impl JobManager {
 
     pub fn exec_all(&mut self) {
         let mut runtime_builder : Builder = Builder::new_multi_thread();
+        runtime_builder.enable_all();
         let runtime : Runtime = match self.nb_thread {
             Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
             None => runtime_builder.build().unwrap()
@@ -40,7 +41,7 @@ impl JobManager {
             println!("start block_on");
             for i in 0..self.cmds.len() {
                 let _r = self.cmds[i]
-                    .exec();
+                    .exec().await;
             }
             println!("stop block_on");
         });
