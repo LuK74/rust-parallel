@@ -1,6 +1,7 @@
 use super::job::Job;
 use std::fmt;
 use tokio::runtime::{Runtime,Builder};
+use log::debug;
 
 pub struct JobManager {
     cmds : Vec<Job>,
@@ -38,12 +39,13 @@ impl JobManager {
         };
 
         runtime.block_on(async {
-            println!("start block_on");
+            debug!("start block_on");
+            
             for i in 0..self.cmds.len() {
                 let _r = self.cmds[i]
                     .exec().await;
             }
-            println!("stop block_on");
+            debug!("stop block_on");
         });
     }
 }

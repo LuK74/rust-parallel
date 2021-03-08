@@ -2,6 +2,9 @@ use rust_parallel::parallel::Parallel;
 use std::env;
 
 fn main() {
+    #[cfg(debug_assertions)]
+    env_logger::init();
+
     let args: Vec<String> = env::args().collect();
 
     let mut prg = Parallel::new();
