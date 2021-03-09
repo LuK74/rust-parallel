@@ -1,0 +1,27 @@
+###########################################
+# To use tasks : cargo install cargo-make #
+###########################################
+
+[tasks.default]
+alias = "build"
+
+[tasks.build]
+command = "cargo"
+args = ["build"]
+
+[tasks.test]
+env = {"RUST_BACKTRACE"="full"}
+command = "cargo"
+args = ["test", "--", "--show-output"]
+
+[tasks.debug]
+description = "Runs the main project with debug logger"
+env = {"RUST_BACKTRACE"="full","RUST_LOG"="debug"}
+command = "cargo"
+args = ["run", "echo", "hello", "world"]
+
+[tasks.run]
+description = "Runs the main project without debug logger"
+env = {"RUST_BACKTRACE"="full"}
+command = "cargo"
+args = ["run", "echo", "hello", "world"]

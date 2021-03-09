@@ -1,6 +1,6 @@
 // use crate::core;
 
-pub fn test(){
+pub fn test() {
     // core::job::test();
     println!("Hello, I am the server.");
 }

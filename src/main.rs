@@ -13,26 +13,56 @@ fn main() {
 }
 
 #[test]
-fn test_echo1(){
-    let args: Vec<String> = vec![
-        String::from("echo"), 
-        String::from("Hello"),
-        String::from("World")
-    ];
+fn test_echo1() {
+    // env_logger::init();
+
     let mut prg = Parallel::new();
+
+    let args: Vec<String> = vec![
+        String::from("echo"),
+        String::from("Hello"),
+        String::from("World"),
+    ];
     prg.new_cmd(args);
+
     prg.start();
 }
 
 #[test]
-fn test_echo2(){
+fn test_echo2() {
+    // env_logger::init();
+
+    let mut prg = Parallel::new();
+
     let args: Vec<String> = vec![
-        String::from("echo"), 
-        String::from("-e"), 
+        String::from("echo"),
+        String::from("-e"),
         String::from("'Hello\nWorld'"),
     ];
-    let mut prg = Parallel::new();
     prg.new_cmd(args);
+
     prg.start();
 }
 
+#[test]
+fn test_multi_echo() {
+    // env_logger::init();
+
+    let mut prg = Parallel::new();
+
+    let args: Vec<String> = vec![
+        String::from("echo"),
+        String::from("Hello"),
+        String::from("World"),
+    ];
+    prg.new_cmd(args);
+
+    let args: Vec<String> = vec![
+        String::from("echo"),
+        String::from("-e"),
+        String::from("'Hello\nWorld'"),
+    ];
+    prg.new_cmd(args);
+
+    prg.start();
+}

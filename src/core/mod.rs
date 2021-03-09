@@ -1,3 +1,3 @@
-pub mod jobmanager;
 pub mod job;
+pub mod jobmanager;
 pub mod parser;
