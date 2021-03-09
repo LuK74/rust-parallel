@@ -1,5 +1,7 @@
 use rust_parallel::parallel::Parallel;
 use std::env;
+use rust_parallel::core::jobmanager::JobManager;
+use rust_parallel::core::interpretor;
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -65,4 +67,20 @@ fn test_multi_echo() {
     prg.new_cmd(args);
 
     prg.start();
+}
+
+#[test]
+fn test_interpretor() {
+    let mut jm = JobManager::new();
+
+    let args: Vec<String> = vec![
+        String::from("--keep-order"),
+        String::from("--dry-run"),
+        String::from("-j"),
+        String::from("3"),
+    ];
+
+    interpretor::interpret(&mut jm, args);
+
+    println!("{}", jm);
 }
