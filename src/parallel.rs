@@ -1,5 +1,9 @@
 use crate::core::job::Job;
 use crate::core::jobmanager::JobManager;
+use crate::remote::*;
+
+use tokio::task;
+
 use log::debug;
 
 pub struct Parallel {
@@ -20,5 +24,13 @@ impl Parallel {
     pub fn start(&mut self) {
         debug!("Parallel start with => {}", self.job_manager);
         self.job_manager.exec_all();
+    }
+}
+
+pub async fn remote_exec_test(client_side: bool) {
+    if client_side {
+        client::test().await;
+    } else {
+        server::test().await;
     }
 }

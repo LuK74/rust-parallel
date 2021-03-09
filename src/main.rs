@@ -1,15 +1,26 @@
+use rust_parallel::parallel;
 use rust_parallel::parallel::Parallel;
+
 use std::env;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     #[cfg(debug_assertions)]
     env_logger::init();
 
     let args: Vec<String> = env::args().collect();
 
-    let mut prg = Parallel::new();
+    if args[1].eq("-c") {
+        println!("Remote execution on Client Side");
+        parallel::remote_exec_test(true).await;
+    } else if args[1].eq("-s") {
+        println!("Remote execution on Server Side");
+        parallel::remote_exec_test(false).await;
+    }
+
+    /*let mut prg = Parallel::new();
     prg.new_cmd(args[1..args.len()].to_vec());
-    prg.start();
+    prg.start();*/
 }
 
 #[test]
