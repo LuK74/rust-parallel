@@ -19,6 +19,6 @@ impl Parallel {
 
     pub fn start(&mut self) {
         debug!("Parallel start with => {}", self.job_manager);
-        self.job_manager.exec_all();
+        self.job_manager.exec();
     }
 }
