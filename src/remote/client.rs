@@ -1,3 +1,5 @@
+use std::rc::Weak;
+use std::rc::Rc;
 use std::net::Ipv4Addr;
 use tokio::io::AsyncWriteExt;
 use tokio::io::Interest;
@@ -6,6 +8,8 @@ use tokio::net::TcpStream;
 
 use std::error::Error;
 use std::io;
+
+use crate::remote::channel::*;
 
 pub async fn test() {
     // Connection
@@ -18,12 +22,9 @@ pub async fn test() {
 }
 
 struct ParallelClient {
-    read_buf: Vec<u8>,
-    write_buf: Vec<u8>,
-
     request: String,
 
-    socket: TcpStream,
+    channel: Channel,
 }
 
 impl ParallelClient {
@@ -33,104 +34,35 @@ impl ParallelClient {
 
         if let Ok(s) = res_connection {
             socket = s;
-            return ParallelClient {
-                read_buf: Vec::new(),
-                write_buf: Vec::new(),
-
+            let mut client : ParallelClient = ParallelClient {
                 request,
 
-                socket: socket,
+                channel : Channel::new(socket),
             };
+
+            let mut reference : Rc<dyn ChannelListener> = Rc::new(client);
+
+            *(reference).channel.setListener(reference);
+
+            client.send_request();
+            return client;
         }
 
         panic!("Couldn't create the socket");
     }
 
-    pub async fn exchange_loop(&mut self) -> Result<(), Box<dyn Error>> {
-        self.send_request();
-
-        let mut ready = self.socket.ready(Interest::WRITABLE).await.unwrap();
-
-        let mut size_response: u64 = 0;
-        let mut size_request: u64 = 0;
-
-        loop {
-            if ready.is_readable() {
-                let mut data = vec![0; 1024];
-
-                match self.socket.try_read(&mut data) {
-                    Ok(n) => {
-                        println!("read {} bytes", n);
-                        if size_response == 0 && n == 4 {
-                            for i in 0..4 {
-                                let value: u64 = data[i] as u64;
-                                size_response = size_response * (0xFF as u64) + value;
-                            }
-                        } else if size_response > 0 {
-                            for i in 0..(n + 1) {
-                                self.read_buf.push(data[i]);
-                            }
-                            size_response = size_response - (n as u64);
-
-                            // insert function which will handle the request
-                            ready = Ready::EMPTY;
-                            self.handle_response();
-                            return Ok(());
-                        }
-                    }
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        size_response = 0;
-                        //continue;
-                    }
-                    Err(e) => {
-                        return Err(e.into());
-                    }
-                }
-            }
-
-            // Write part
-            if ready.is_writable() {
-                if size_request == 0 {
-                    size_request = self.write_buf.len() as u64;
-                    match self.socket.try_write(&mut size_response.to_ne_bytes()) {
-                        Ok(n) => {
-                            if n != 8 {
-                                panic!("NYI when size isn't sent entirely");
-                            }
-                        }
-                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                            size_request = 0;
-                            continue;
-                        }
-                        Err(e) => {
-                            return Err(e.into());
-                        }
-                    }
-                } else {
-                    match self.socket.try_write(&mut self.write_buf) {
-                        Ok(n) => {
-                            size_request -= n as u64;
-                            if size_request == 0 {
-                                ready = self.socket.ready(Interest::READABLE).await.unwrap();
-                            }
-                        }
-                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                            continue;
-                        }
-                        Err(e) => {
-                            return Err(e.into());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     pub async fn send_request(&mut self) {
-        self.write_buf = self.request.clone().into_bytes();
+        self.channel.send(self.request.clone().into_bytes());
+    }
+}
+
+impl ChannelListener for ParallelClient {
+    fn received(&self, buffer: std::vec::Vec<u8>) {
+        println!("Result :");
+        println!("{:?}", buffer);
     }
 
-    pub async fn handle_response(&mut self) {
-        println!("Reponse data : {:?}", self.read_buf);
+    fn sent(&self) {
+        println!("Message has been sent");
     }
 }
