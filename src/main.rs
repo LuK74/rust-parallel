@@ -2,6 +2,7 @@ use rust_parallel::parallel::Parallel;
 use std::env;
 use rust_parallel::core::jobmanager::JobManager;
 use rust_parallel::core::interpretor;
+use rust_parallel::core::parser;
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -83,4 +84,9 @@ fn test_interpretor() {
     interpretor::interpret(&mut jm, args);
 
     println!("{}", jm);
+}
+
+#[test]
+fn test_parser() {
+    parser::parse();
 }
