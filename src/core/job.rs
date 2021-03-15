@@ -2,6 +2,8 @@ extern crate tokio;
 use log::debug;
 use std::fmt;
 use tokio::process::{Child, Command};
+use std::thread;
+use std::process;
 
 pub struct Job {
     cmd: String,
@@ -34,6 +36,7 @@ impl Job {
     }
 
     pub async fn exec(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        debug!("{} {:?}",process::id(), thread::current().id());
         let mut command: Command = Command::new(self.cmd.clone());
         for arg in &self.parameter {
             command.arg(&arg.clone());

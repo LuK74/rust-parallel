@@ -2,6 +2,9 @@ use super::job::Job;
 use log::debug;
 use std::fmt;
 use tokio::runtime::{Builder, Runtime};
+use std::thread;
+use std::process;
+
 
 pub struct JobManager {
     cmds: Vec<Job>,
@@ -26,7 +29,7 @@ impl JobManager {
             cmds: vec![],
             nb_thread: None,
             dry_run : false,
-            keep_order : false
+            keep_order : true
         }
     }
 
@@ -55,25 +58,31 @@ impl JobManager {
     }
 
     fn exec_all(&mut self){
+        debug!("{} {:?}",process::id(), thread::current().id());
         let mut runtime_builder: Builder = Builder::new_multi_thread();
         runtime_builder.enable_all();
         let runtime: Runtime = match self.nb_thread {
-            Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
             None => runtime_builder.build().unwrap(),
+            Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
         };
 
         runtime.block_on(async {
             debug!("start block_on");
 
-            if self.keep_order {
-                for i in 0..self.cmds.len() {
-                    let _r = self.cmds[i].exec().await;
-                }
-            }else{
-                for i in 0..self.cmds.len() {
-                    let _r = self.cmds[i].exec();
-                }
+            let mut tasks = vec![];
+
+            for mut cmd in self.cmds.drain(..){
+                let task = tokio::spawn(async move {
+                    let _r = cmd.exec().await;
+                });
+                tasks.push(task);
             }
+
+            if self.keep_order {
+                for task in tasks.drain(..){
+                    task.await.unwrap();
+                }
+            }   
 
             debug!("stop block_on");
         });

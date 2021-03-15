@@ -14,7 +14,7 @@ fn main() {
 
 #[test]
 fn test_echo1() {
-    // env_logger::init();
+    let _ = env_logger::builder().is_test(true).try_init();
 
     let mut prg = Parallel::new();
 
@@ -30,7 +30,7 @@ fn test_echo1() {
 
 #[test]
 fn test_echo2() {
-    // env_logger::init();
+    let _ = env_logger::builder().is_test(true).try_init();
 
     let mut prg = Parallel::new();
 
@@ -46,7 +46,7 @@ fn test_echo2() {
 
 #[test]
 fn test_multi_echo() {
-    // env_logger::init();
+    let _ = env_logger::builder().is_test(true).try_init();
 
     let mut prg = Parallel::new();
 
