@@ -13,7 +13,7 @@ use crate::remote::channel::*;
 
 pub async fn test() -> Result<(), Box<dyn Error>> {
     // Connection
-    let mut listener = TcpListener::bind("127.0.0.1:4000").await?;
+    let listener = TcpListener::bind("127.0.0.1:4000").await?;
     println!("Server opened on port 4000");
 
     let (socket, _) = listener.accept().await?;
@@ -41,6 +41,14 @@ pub async fn test() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+pub async fn test_exchange() -> Result<(), Box<dyn Error>> {
+    let listener = TcpListener::bind("127.0.0.1:4000").await?;
+    println!("Server opened on port 4000");
+
+    waiting_request(listener).await;
+    Ok(())
+}
+
 pub async fn waiting_request(listener: TcpListener) -> Result<(), ()> {
     loop {
         //let (mut socket, _) : (tokio::net::TcpStream, std::net::SocketAddr);
@@ -48,8 +56,8 @@ pub async fn waiting_request(listener: TcpListener) -> Result<(), ()> {
         if let Ok((s, _)) = listener.accept().await {
             //socket = s;
             tokio::spawn(async move {
-                let mut worker = ParallelWorker::new(s);
-                //worker.exchange_loop();
+                let mut worker = ParallelWorker::new();
+                worker.start_worker(s);
             });
 
             continue;
@@ -57,35 +65,43 @@ pub async fn waiting_request(listener: TcpListener) -> Result<(), ()> {
             panic!("Error while accepting connection request");
         }
     }
-
-    Ok(())
 }
 
 struct ParallelWorker {
-    request: String,
-
-    channel: Channel,
+    request_result : String,
+    request : String,
 }
 
 impl ParallelWorker {
-    pub fn new(socket: TcpStream) -> Self {
-        let worker : ParallelWorker = ParallelWorker{
-            request: String::new(),
+    pub fn new() -> Self {
+        ParallelWorker {
+           request_result : String::new(),
+           request : String::new(),
+        }
+    }
 
-            channel: Channel::new(socket),
-        };
-        worker.channel.setListener(Rc::new(worker));
-        return worker;
+    pub async fn start_worker(&mut self, socket : TcpStream) {
+        let mut channel : Channel = Channel::new(socket);
+
+        channel.set_listener(self);
+        channel.set_interest(Interest::READABLE).await;
+
+        // Should spawn a thread to do this work
+        // Result isn't correctly handled yet
+        channel.exchange_loop().await.unwrap();
+        
+        //self.send_request(&mut channel);
     }
 }
 
 impl ChannelListener for ParallelWorker {
-    fn received(&self, buffer: Vec<u8>) {
+    fn received(&self, buffer: Vec<u8>, channel : &mut Channel) {
         println!("Request data : {:?}", buffer);
         // Here we'll need to call the parralel application
     }
 
-    fn sent(&self) {
+    fn sent(&self, channel : &mut Channel) {
         println!("Result of request has been sent");
+        channel.close();
     }
 }

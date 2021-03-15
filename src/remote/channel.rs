@@ -1,21 +1,17 @@
-use std::rc::Weak;
-use std::rc::Rc;
-use std::error::Error;
 use std::io;
-use tokio::io::AsyncWriteExt;
 use tokio::io::Interest;
 use tokio::io::Ready;
 use tokio::net::TcpStream;
 
 pub trait ChannelListener {
     // Method invoked when a message has been fully read
-    fn received(&self, buffer: Vec<u8>);
+    fn received(&self, buffer: Vec<u8>, channel : &mut Channel);
 
     // Method invoked when a message has been fully sent
-    fn sent(&self);
+    fn sent(&self, channel : &mut Channel);
 }
 
-pub struct Channel {
+pub struct Channel<'a> {
     read_buf: Vec<u8>,
     write_buf: Vec<u8>,
 
@@ -23,10 +19,10 @@ pub struct Channel {
 
     socket: TcpStream,
 
-    listener: Option<Rc<dyn ChannelListener>>,
+    listener: Option<&'a dyn ChannelListener>,
 }
 
-impl Channel {
+impl<'a> Channel<'a> {
     pub fn new(socket: TcpStream) -> Self {
         Channel {
             read_buf: Vec::new(),
@@ -40,11 +36,11 @@ impl Channel {
         }
     }
 
-    pub async fn setInterest(&mut self, interest: Interest) {
+    pub async fn set_interest(&mut self, interest: Interest) {
         self.ready = self.socket.ready(interest).await.unwrap();
     }
 
-    pub fn setListener(&mut self, listener: Rc<dyn ChannelListener>) {
+    pub fn set_listener(&mut self, listener: &'a dyn ChannelListener) {
         self.listener = Some(listener);
     }
 
@@ -83,7 +79,7 @@ impl Channel {
                             size_request = size_request - (n as u64);
 
                             // insert function which will handle the request
-                            self.listener.as_ref().unwrap().received(self.read_buf.clone());
+                            self.listener.as_ref().unwrap().received(self.read_buf.clone(), self);
                             self.ready = self.socket.ready(Interest::WRITABLE).await.unwrap();
                         }
                     }
@@ -122,7 +118,7 @@ impl Channel {
                             if size_response <= 0 {
                                 size_response = 0;
                                 self.ready = self.socket.ready(Interest::READABLE).await.unwrap();
-                                self.listener.as_ref().unwrap().sent();
+                                self.listener.as_ref().unwrap().sent(self);
                             }
                         }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {

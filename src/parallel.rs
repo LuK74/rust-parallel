@@ -27,10 +27,10 @@ impl Parallel {
     }
 }
 
-pub async fn remote_exec_test(client_side: bool) {
+pub async fn remote_exec_test(client_side: bool, args : Vec<String>) {
     if client_side {
-        client::test().await;
+        client::test_exchange(args).await;
     } else {
-        server::test().await;
+        server::test_exchange().await;
     }
 }

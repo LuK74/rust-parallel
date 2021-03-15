@@ -1,13 +1,6 @@
-use std::rc::Weak;
-use std::rc::Rc;
-use std::net::Ipv4Addr;
 use tokio::io::AsyncWriteExt;
 use tokio::io::Interest;
-use tokio::io::Ready;
 use tokio::net::TcpStream;
-
-use std::error::Error;
-use std::io;
 
 use crate::remote::channel::*;
 
@@ -21,48 +14,58 @@ pub async fn test() {
     println!("Hello, I am the client.");
 }
 
+pub async fn test_exchange(args : Vec<String>) {
+    let mut client : ParallelClient = ParallelClient::new(String::from("127.0.0.1:4000"), args[0].clone()).await;
+    client.start_client().await;
+}
+
 struct ParallelClient {
     request: String,
-
-    channel: Channel,
+    server_address : String,
 }
 
 impl ParallelClient {
-    pub async fn new(server_adress: String, request: String) -> Self {
-        let socket: TcpStream;
-        let res_connection = TcpStream::connect(server_adress).await;
+
+    pub async fn new(server_address: String, request: String) -> Self {
+        ParallelClient {
+            request, 
+            server_address,
+        }
+    }
+
+    pub async fn start_client(&mut self) {
+        let res_connection = TcpStream::connect(self.server_address.clone()).await;
+
+        let mut channel : Channel;
 
         if let Ok(s) = res_connection {
-            socket = s;
-            let mut client : ParallelClient = ParallelClient {
-                request,
-
-                channel : Channel::new(socket),
-            };
-
-            let mut reference : Rc<dyn ChannelListener> = Rc::new(client);
-
-            *(reference).channel.setListener(reference);
-
-            client.send_request();
-            return client;
+            channel = Channel::new(s);
+        } else {
+            panic!("Couldn't connect to the server");
         }
 
-        panic!("Couldn't create the socket");
+        channel.set_listener(self);
+        channel.send(self.request.clone().into_bytes());
+        channel.set_interest(Interest::WRITABLE).await;
+
+        // Should spawn a thread to do this work
+        // Result isn't correctly handled yet
+        channel.exchange_loop().await.unwrap();
+        
+        //self.send_request(&mut channel);
     }
 
-    pub async fn send_request(&mut self) {
-        self.channel.send(self.request.clone().into_bytes());
-    }
 }
 
 impl ChannelListener for ParallelClient {
-    fn received(&self, buffer: std::vec::Vec<u8>) {
+    
+    fn received(&self, buffer : Vec<u8>, channel : &mut Channel) {
         println!("Result :");
         println!("{:?}", buffer);
+        channel.close();
     }
 
-    fn sent(&self) {
+    fn sent(&self, channel : &mut Channel) {
         println!("Message has been sent");
     }
 }
