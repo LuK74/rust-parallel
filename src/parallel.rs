@@ -2,7 +2,6 @@ use crate::core::job::Job;
 use crate::core::jobmanager::JobManager;
 use crate::remote::*;
 
-use tokio::task;
 
 use log::debug;
 
@@ -31,6 +30,6 @@ pub async fn remote_exec_test(client_side: bool, args : Vec<String>) {
     if client_side {
         client::test_exchange(args).await;
     } else {
-        server::test_exchange().await;
+        server::test_exchange().await.unwrap();
     }
 }
