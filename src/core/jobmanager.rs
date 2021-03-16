@@ -6,6 +6,7 @@ use tokio::task::JoinHandle;
 use std::thread;
 use std::process;
 use tokio::sync::mpsc;
+use futures::future;
 
 pub struct JobManager {
     cmds: Vec<Job>,
@@ -97,7 +98,7 @@ impl JobManager {
                 counter += 1;
             }
 
-            futures::future::join_all(tasks).await;
+            future::join_all(tasks).await;
 
             debug!("stop block_on");
         });
