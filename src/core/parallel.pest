@@ -1,3 +1,7 @@
+///////////////////////////////////////////////////////////////////
+// THIS FILE CONTAINS THE GRAMMAR FOR PARALLEL ARGUMENT PARSING. //
+///////////////////////////////////////////////////////////////////
+
 WHITESPACE = _{ " " } // will be implicitly inserted at every sequence and 
                       // between every repetition (except in atomic rules)
 
