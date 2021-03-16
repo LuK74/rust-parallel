@@ -4,6 +4,8 @@ use std::fmt;
 use tokio::process::{Child, Command};
 use std::thread;
 use std::process;
+use std::process::Stdio;
+use tokio::io;
 
 pub struct Job {
     cmd: String,
@@ -42,12 +44,60 @@ impl Job {
             command.arg(&arg.clone());
         }
 
-        let mut _child: Child = command.spawn()?;
-        debug!("<{}> spawn", self);
-        // let stdout = child.stdout.take().unwrap();
+        // let mut _child: Child = command.spawn()?;
+        // debug!("<{}> spawn", self);
 
-        // debug!("stderr of {:?} : {:?}", self.cmd, stdout);
+        let mut child : Child = command.stdout(Stdio::piped()).spawn()?;
+        let mut stdout = child.stdout.take().unwrap();
+        // let result: Vec<_> = io::BufReader::new(stdout)
+        // .lines
+        // .inspect(|s| println!("> {:?}", s))
+        // .collect();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::runtime::{Builder, Runtime};
+
+    fn init (nb_thread : Option<usize>) -> Runtime {
+        let mut runtime_builder: Builder = Builder::new_multi_thread();
+        runtime_builder.enable_all();
+        let runtime: Runtime = match nb_thread {
+            None => runtime_builder.build().unwrap(),
+            Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
+        };
+
+        runtime
+    }
+
+    #[test]
+    fn job_cmd1() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let runtime = init(Some(5));
+
+        runtime.block_on(async {
+            let _cmd : Child = Command::new(String::from("echo"))
+                .arg(String::from("Hello World"))
+                .spawn()
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn job_cmd2() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let runtime = init(Some(5));
+
+        runtime.block_on(async {
+            let cmd : Child = Command::new(String::from("echo Hello World"))
+                .spawn()
+                .unwrap();
+        });
     }
 }
