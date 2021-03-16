@@ -118,6 +118,8 @@ mod tests {
     use std::thread::sleep;
     use std::time::Duration;
 
+    static NB_THREAD : Option<usize> = Some(5);
+
     fn init_jm (nb : Option<usize>, d_r : bool, k_o : bool) -> JobManager {
         let mut jobmanager = JobManager::new();
         jobmanager.set_exec_env(nb, d_r, k_o);
@@ -129,7 +131,7 @@ mod tests {
     fn test_echo1() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut jobmanager = init_jm(Some(1), false, false);
+        let mut jobmanager = init_jm(NB_THREAD, false, false);
 
         let args: Vec<String> = vec![
             String::from("echo"),
@@ -145,7 +147,7 @@ mod tests {
     fn test_echo2() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut jobmanager = init_jm(Some(1), false, true);
+        let mut jobmanager = init_jm(NB_THREAD, false, true);
 
         let args: Vec<String> = vec![
             String::from("sleep"),
@@ -170,8 +172,6 @@ mod tests {
 
         jobmanager.exec();
     }
-
-    static NB_THREAD : Option<usize> = Some(5);
 
     fn init (nb_thread : Option<usize>) -> (JobManager, Runtime) {
         let jobmanager = init_jm(nb_thread, false, false);
