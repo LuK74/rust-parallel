@@ -83,14 +83,13 @@ impl<'a> Channel<'a> {
 
                 match read_result {
                     Ok(n) => {
-                        println!("read {} bytes", n);
                         if size_request == 0 && n == 8 {
                             for i in 0..8 {
                                 let value: u64 = size[7-i] as u64;
                                 size_request = size_request * (0xFF as u64) + value;
                             }
                         } else if size_request > 0 {
-                            for i in 0..(n + 1) {
+                            for i in 0..n  {
                                 self.read_buf.push(data[i]);
                             }
                             size_request = size_request - (n as u64);
@@ -128,13 +127,11 @@ impl<'a> Channel<'a> {
             if self.ready.is_writable() {
                 if size_response == 0 {
                     size_response = self.write_buf.len() as u64;
-                    println!("Sending size {}", size_response);
                     match self.socket.try_write(&mut size_response.to_ne_bytes()) {
                         Ok(n) => {
                             if n != 8 {
                                 panic!("NYI when size isn't sent entirely");
                             }
-                            println!("Sent {} bytes", n);
                         }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                             size_response = 0;
@@ -158,7 +155,6 @@ impl<'a> Channel<'a> {
                                     self.close();
                                 }
                             }
-                            println!("Sent {} bytes", n);
                         }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                             continue;

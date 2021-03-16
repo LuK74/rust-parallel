@@ -5,10 +5,10 @@ use crate::remote::channel::*;
 
 pub async fn test_exchange(args : Vec<String>) {
     let mut client : ParallelClient = ParallelClient::new(String::from("127.0.0.1:4000"), args[0].clone());
-    client.start_client().await;
+    client.start_client().await.unwrap();
 }
 
-struct ParallelClient {
+pub struct ParallelClient {
     request: String,
     request_response: String,
     server_address : String,
@@ -24,7 +24,7 @@ impl ParallelClient {
         }
     }
 
-    pub async fn start_client(&mut self) {
+    pub async fn start_client(&mut self) -> Result<String, String> {
         let res_connection = TcpStream::connect(self.server_address.clone()).await;
 
         let mut channel : Channel;
@@ -46,7 +46,7 @@ impl ParallelClient {
         // Result isn't correctly handled yet
         channel.exchange_loop().unwrap();
         
-        //self.send_request(&mut channel);
+        Ok(self.request_response.clone())
     }
 
 }
@@ -54,17 +54,14 @@ impl ParallelClient {
 impl ChannelListener for ParallelClient {
     
     fn received(&mut self, buffer : Vec<u8>) -> Option<Vec<u8>> {
-        println!("Result :");
-        println!("{:?}", buffer);
-
         self.request_response = String::from_utf8(buffer).unwrap();
 
-        println!("Message : {}", self.request_response);
+        println!("Client : message received : {:?}", self.request_response);
         None
     }
 
     fn sent(&mut self) -> Option<()> {
-        println!("Message has been sent");
+        println!("Client : message to sent {}", self.request);
         Some(())
     }
 }
