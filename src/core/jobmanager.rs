@@ -2,6 +2,9 @@ use super::job::Job;
 use log::debug;
 use std::fmt;
 use tokio::runtime::{Builder, Runtime};
+use std::thread;
+use std::process;
+
 
 pub struct JobManager {
     cmds: Vec<Job>,
@@ -26,7 +29,7 @@ impl JobManager {
             cmds: vec![],
             nb_thread: None,
             dry_run : false,
-            keep_order : false
+            keep_order : true
         }
     }
 
@@ -55,24 +58,163 @@ impl JobManager {
     }
 
     fn exec_all(&mut self){
+        debug!("{} {:?}",process::id(), thread::current().id());
+        
         let mut runtime_builder: Builder = Builder::new_multi_thread();
         runtime_builder.enable_all();
         let runtime: Runtime = match self.nb_thread {
-            Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
             None => runtime_builder.build().unwrap(),
+            Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
         };
 
         runtime.block_on(async {
             debug!("start block_on");
 
+            let mut tasks = vec![];
+
+            for mut cmd in self.cmds.drain(..){
+                let task = tokio::spawn(async move {
+                    let _r = cmd.exec().await;
+                });
+                tasks.push(task);
+            }
+
             if self.keep_order {
-                for i in 0..self.cmds.len() {
-                    let _r = self.cmds[i].exec().await;
+                for task in tasks.drain(..){
+                    task.await.unwrap();
                 }
-            }else{
-                for i in 0..self.cmds.len() {
-                    let _r = self.cmds[i].exec();
-                }
+            }  
+
+            debug!("stop block_on");
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread::sleep;
+    use std::time::Duration;
+
+    fn init_jm (nb : Option<usize>, d_r : bool, k_o : bool) -> JobManager {
+        let mut jobmanager = JobManager::new();
+        jobmanager.set_exec_env(nb, d_r, k_o);
+
+        jobmanager
+    }
+
+        #[test]
+    fn test_echo1() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut jobmanager = init_jm(Some(1), false, false);
+
+        let args: Vec<String> = vec![
+            String::from("echo"),
+            String::from("-e"),
+            String::from("'Hello\nWorld'"),
+        ];
+        jobmanager.add_job(Job::new(args));
+
+        jobmanager.exec();
+    }
+
+    #[test]
+    fn test_echo2() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut jobmanager = init_jm(Some(1), false, false);
+
+        let args: Vec<String> = vec![
+            String::from("echo"),
+            String::from("Hello"),
+            String::from("World"),
+        ];
+        jobmanager.add_job(Job::new(args));
+
+
+        let args: Vec<String> = vec![
+            String::from("echo"),
+            String::from("-e"),
+            String::from("'Hello\nWorld'"),
+        ];
+        jobmanager.add_job(Job::new(args));
+
+        jobmanager.exec();
+    }
+
+    static NB_THREAD : Option<usize> = Some(2);
+
+    fn init (nb_thread : Option<usize>) -> (JobManager, Runtime) {
+        let jobmanager = init_jm(nb_thread, false, false);
+
+        let mut runtime_builder: Builder = Builder::new_multi_thread();
+        runtime_builder.enable_all();
+        let runtime: Runtime = match nb_thread {
+            None => runtime_builder.build().unwrap(),
+            Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
+        };
+
+        (jobmanager,runtime)
+    }
+
+    #[test]
+    fn jobmanager_thread_worker() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let (_jobmanager,runtime) = init(NB_THREAD);
+
+        runtime.block_on(async {
+            debug!("start block_on");
+            
+            for i in 0..10 {
+                debug!("{} {:?}", process::id(), thread::current().id());
+                let _task = tokio::spawn(async move {
+                    debug!("{} {} {:?}",i,process::id(), thread::current().id());
+                });
+            }
+
+            debug!("stop block_on");
+        });
+    }
+
+    #[test]
+    fn jobmanager_thread_worker2() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let (_jobmanager,runtime) = init(NB_THREAD);
+
+        runtime.block_on(async {
+            debug!("start block_on");
+            
+            for i in 0..5 {
+                let _task = tokio::spawn(async move {
+                    debug!("{}.{} | {:?}",i,1, thread::current().id());
+                    sleep(Duration::from_secs(2));
+                    debug!("{}.{}",i,2);
+                });
+            }
+
+            debug!("stop block_on");
+        });
+    }
+
+    #[test]
+    fn jobmanager_thread_worker3() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let (_jobmanager,runtime) = init(NB_THREAD);
+
+        runtime.block_on(async {
+            debug!("start block_on");
+            
+            for i in 0..5 {
+                let task = tokio::spawn(async move {
+                    debug!("{}.{} | {:?}",i,1, thread::current().id());
+                    sleep(Duration::from_secs(3));
+                    debug!("{}.{}",i,2);
+                });
+                task.await.unwrap();
             }
 
             debug!("stop block_on");
