@@ -1,11 +1,9 @@
 extern crate tokio;
 use log::debug;
 use std::fmt;
-use tokio::process::{Child, Command};
+use tokio::process::Command;
 use std::thread;
 use std::process;
-use std::process::Stdio;
-use tokio::io;
 
 pub struct Job {
     cmd: String,
@@ -37,24 +35,18 @@ impl Job {
         Job { cmd, parameter }
     }
 
-    pub async fn exec(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn exec(&mut self) -> Result<process::Output, Box<dyn std::error::Error>> {
         debug!("{} {:?}",process::id(), thread::current().id());
         let mut command: Command = Command::new(self.cmd.clone());
         for arg in &self.parameter {
             command.arg(&arg.clone());
         }
 
-        // let mut _child: Child = command.spawn()?;
-        // debug!("<{}> spawn", self);
+        let future = command.output();
+        debug!("<{}> spawn", self);
+        let output : process::Output = future.await?;
 
-        let mut child : Child = command.stdout(Stdio::piped()).spawn()?;
-        let mut stdout = child.stdout.take().unwrap();
-        // let result: Vec<_> = io::BufReader::new(stdout)
-        // .lines
-        // .inspect(|s| println!("> {:?}", s))
-        // .collect();
-
-        Ok(())
+        Ok(output)
     }
 }
 
@@ -62,6 +54,7 @@ impl Job {
 mod tests {
     use super::*;
     use tokio::runtime::{Builder, Runtime};
+    use tokio::process::Child;
 
     fn init (nb_thread : Option<usize>) -> Runtime {
         let mut runtime_builder: Builder = Builder::new_multi_thread();
@@ -95,7 +88,7 @@ mod tests {
         let runtime = init(Some(5));
 
         runtime.block_on(async {
-            let cmd : Child = Command::new(String::from("echo Hello World"))
+            let _cmd : Child = Command::new(String::from("echo Hello World"))
                 .spawn()
                 .unwrap();
         });

@@ -2,9 +2,10 @@ use super::job::Job;
 use log::debug;
 use std::fmt;
 use tokio::runtime::{Builder, Runtime};
+use tokio::task::JoinHandle;
 use std::thread;
 use std::process;
-
+use tokio::sync::mpsc;
 
 pub struct JobManager {
     cmds: Vec<Job>,
@@ -67,23 +68,36 @@ impl JobManager {
             Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
         };
 
+        let nb_cmd = self.cmds.len();
+
         runtime.block_on(async {
+            debug!("{} {:?}",process::id(), thread::current().id());
             debug!("start block_on");
 
-            let mut tasks = vec![];
-
+            let mut tasks : Vec<JoinHandle<_>> = vec![];
+            let (tx, mut rx) = mpsc::channel::<process::Output>(1);
             for mut cmd in self.cmds.drain(..){
+                let tx_task = tx.clone();
                 let task = tokio::spawn(async move {
-                    let _r = cmd.exec().await;
+                    let res = cmd.exec().await.unwrap();
+                    // match res {
+                    //     // Ok(output) => println!("{}", String::from_utf8(output.stdout.clone()).unwrap()),
+                    //     Ok(output) => tx_task.send(output).await,
+                    //     Err(e) => {println!("{}", e); Ok(())},
+                    // };
+                    tx_task.send(res).await.unwrap();
                 });
                 tasks.push(task);
             }
 
-            if self.keep_order {
-                for task in tasks.drain(..){
-                    task.await.unwrap();
-                }
-            }  
+            let mut counter : usize = 0;
+            while counter < nb_cmd {
+                let message = rx.recv().await.unwrap();
+                println!("GOT = {}", String::from_utf8(message.stdout.clone()).unwrap());
+                counter += 1;
+            }
+
+            futures::future::join_all(tasks).await;
 
             debug!("stop block_on");
         });
@@ -103,7 +117,7 @@ mod tests {
         jobmanager
     }
 
-        #[test]
+    #[test]
     fn test_echo1() {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -126,6 +140,12 @@ mod tests {
         let mut jobmanager = init_jm(Some(1), false, false);
 
         let args: Vec<String> = vec![
+            String::from("sleep"),
+            String::from("5"),
+        ];
+        jobmanager.add_job(Job::new(args));
+
+        let args: Vec<String> = vec![
             String::from("echo"),
             String::from("Hello"),
             String::from("World"),
@@ -143,7 +163,7 @@ mod tests {
         jobmanager.exec();
     }
 
-    static NB_THREAD : Option<usize> = Some(2);
+    static NB_THREAD : Option<usize> = Some(5);
 
     fn init (nb_thread : Option<usize>) -> (JobManager, Runtime) {
         let jobmanager = init_jm(nb_thread, false, false);
@@ -176,6 +196,8 @@ mod tests {
 
             debug!("stop block_on");
         });
+
+        debug!("end test");
     }
 
     #[test]
@@ -197,6 +219,8 @@ mod tests {
 
             debug!("stop block_on");
         });
+
+        debug!("end test");
     }
 
     #[test]
@@ -219,5 +243,39 @@ mod tests {
 
             debug!("stop block_on");
         });
+
+        debug!("end test");
+    }
+
+    #[test]
+    fn jobmanager_thread_worker4() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let (_jobmanager,runtime) = init(NB_THREAD);
+
+        runtime.block_on(async {
+            debug!("start block_on");
+
+            let mut tasks : Vec<tokio::task::JoinHandle<()>> = vec![];
+            
+            for i in 0..5 {
+                let task = tokio::spawn(async move {
+                    debug!("{}.{} | {:?}",i,1, thread::current().id());
+                    sleep(Duration::from_secs(3));
+                    debug!("{}.{}",i,2);
+                });
+                tasks.push(task);
+            }
+
+            // for task in tasks.drain(..){
+            //     task.await.unwrap();
+            // }
+
+            futures::future::join_all(tasks).await;
+
+            debug!("stop block_on");
+        });
+
+        debug!("end test");
     }
 }
