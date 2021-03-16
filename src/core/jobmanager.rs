@@ -31,7 +31,7 @@ impl JobManager {
             cmds: vec![],
             nb_thread: None,
             dry_run : false,
-            keep_order : true
+            keep_order : false
         }
     }
 
@@ -76,26 +76,33 @@ impl JobManager {
             debug!("start block_on");
 
             let mut tasks : Vec<JoinHandle<_>> = vec![];
-            let (tx, mut rx) = mpsc::channel::<process::Output>(1);
+            let (tx, mut rx) = mpsc::channel::<(i32,process::Output)>(1);
+            let mut order : i32 = 0;
             for mut cmd in self.cmds.drain(..){
                 let tx_task = tx.clone();
                 let task = tokio::spawn(async move {
                     let res = cmd.exec().await.unwrap();
-                    // match res {
-                    //     // Ok(output) => println!("{}", String::from_utf8(output.stdout.clone()).unwrap()),
-                    //     Ok(output) => tx_task.send(output).await,
-                    //     Err(e) => {println!("{}", e); Ok(())},
-                    // };
-                    tx_task.send(res).await.unwrap();
+                    tx_task.send((order,res)).await.unwrap();
                 });
                 tasks.push(task);
+                order+=1;
             }
 
             let mut counter : usize = 0;
+            let mut messages = vec![Default::default(); nb_cmd];
             while counter < nb_cmd {
-                let message = rx.recv().await.unwrap();
-                println!("GOT = {}", String::from_utf8(message.stdout.clone()).unwrap());
+                let (order, message) = rx.recv().await.unwrap();
+                if self.keep_order {
+                    debug!("order {}", order);
+                    messages.insert(order as usize, String::from_utf8(message.stdout.clone()).unwrap());
+                }else{
+                    messages.insert(counter, String::from_utf8(message.stdout.clone()).unwrap());
+                }
                 counter += 1;
+            }
+
+            for i in 0..messages.len() {
+                println!("GOT = {}", messages[i]);
             }
 
             future::join_all(tasks).await;
@@ -138,7 +145,7 @@ mod tests {
     fn test_echo2() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut jobmanager = init_jm(Some(1), false, false);
+        let mut jobmanager = init_jm(Some(1), false, true);
 
         let args: Vec<String> = vec![
             String::from("sleep"),
