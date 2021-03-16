@@ -1,0 +1,39 @@
+WHITESPACE = _{ " " } // will be implicitly inserted at every sequence and 
+                      // between every repetition (except in atomic rules)
+
+main = {^"parallel" ~ options* ~ commands ~ separators*}
+
+options = { 
+  ^"--dry-run" 
+| ^"--keep-order" 
+| ^"--pipe" 
+| ^"--jobs" ~ ASCII_DIGIT+ 
+| ^"-j" ~ ASCII_DIGIT+ 
+| ^"--help" 
+}
+
+commands = { string ~ arguments* }
+
+arguments = { target 
+            | quoted_char 
+            | string } 
+
+target = { "{" ~ ASCII_DIGIT* ~ "}" }
+
+quoted_char = { "'" ~ ANY ~ "'" }
+
+separator = { ":::" } // to extend in future needs
+
+separators = { separator ~ input+ }
+
+input = { ASCII_DIGIT+ | string }
+
+special = { target 
+          | quoted_char 
+          | separator } // special characters that should be interpreted !
+
+string = @{ 
+    !(" " | special) // if the following isn't a whitespace or a special
+    ~ ANY            // then consume one character
+    ~ string?        // and continue
+}
