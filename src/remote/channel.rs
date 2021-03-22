@@ -35,7 +35,7 @@ impl<'a> Channel<'a> {
 
             listener: None,
 
-            running : false,
+            running: false,
         }
     }
 
@@ -68,7 +68,6 @@ impl<'a> Channel<'a> {
         }
 
         while self.running {
-
             if self.ready.is_readable() {
                 let mut data = vec![0; 1024];
                 let mut size = vec![0; 8];
@@ -84,33 +83,45 @@ impl<'a> Channel<'a> {
                 match read_result {
                     Ok(n) => {
                         if size_request == 0 && n == 8 {
+                            let mut array = [0;8];
                             for i in 0..8 {
-                                let value: u64 = size[7-i] as u64;
+                                let value: u64 = size[7 - i] as u64;
+                                array[i] = size[i];
                                 size_request = size_request * (0xFF as u64) + value;
                             }
+                            size_request = u64::from_le_bytes(array);
                         } else if size_request > 0 {
-                            for i in 0..n  {
+                            for i in 0..n {
                                 self.read_buf.push(data[i]);
                             }
+                            println!("{}", n);
+                            println!("size_request : {}", size_request);
                             size_request = size_request - (n as u64);
-                            
+                            data.clear();
+
                             if size_request <= 0 {
                                 // insert function which will handle the request
-                                if let Some(next_msg) = self.listener.as_mut().unwrap().received(self.read_buf.clone()) {
+                                if let Some(next_msg) = self
+                                    .listener
+                                    .as_mut()
+                                    .unwrap()
+                                    .received(self.read_buf.clone())
+                                {
                                     self.ready = Ready::WRITABLE;
                                     self.send(next_msg);
                                 } else {
                                     self.close();
                                 }
                                 //self.ready = self.socket.ready(Interest::WRITABLE).await.unwrap();
-                                
-                                
-                                size_request = 0;
+                                self.read_buf.clear();
+                                size_request = 0;      
                             }
                         }
 
                         if n == 0 {
-                            return Err(String::from("Channel has been closed unexpectedly"));
+                            if self.running != false {
+                                return Err(String::from("Channel has been closed unexpectedly"));
+                            }
                         }
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -144,7 +155,9 @@ impl<'a> Channel<'a> {
                 } else {
                     match self.socket.try_write(&mut self.write_buf) {
                         Ok(n) => {
+                            println!("wrote {} bytes", n);
                             size_response -= n as u64;
+                            self.write_buf = self.write_buf.split_off(n);
                             if size_response <= 0 {
                                 size_response = 0;
                                 //self.ready = self.socket.ready(Interest::READABLE).await.unwrap();

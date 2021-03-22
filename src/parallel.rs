@@ -2,7 +2,6 @@ use crate::core::job::Job;
 use crate::core::jobmanager::JobManager;
 use crate::remote::*;
 
-
 use log::debug;
 
 pub struct Parallel {
@@ -26,7 +25,7 @@ impl Parallel {
     }
 }
 
-pub async fn remote_exec_test(client_side: bool, args : Vec<String>) {
+pub async fn remote_exec_test(client_side: bool, args: Vec<String>) {
     if client_side {
         client::test_exchange(args).await;
     } else {
