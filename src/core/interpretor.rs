@@ -1,5 +1,5 @@
 use super::jobmanager::JobManager;
-use log::debug;
+//use log::debug;
 
 // To see the avaible Rules & Pairs:
 #[derive(Parser)]
@@ -7,10 +7,45 @@ use log::debug;
 pub struct ParallelParser;
 use pest::iterators::Pairs;
 
+struct JobValues {
+    value: String,
+    next_value: Option<Box<JobValues>>,
+}
+
+fn orderer (vector : Vec<Vec<&str>>) -> Vec<usize> {
+    let mut vec_new = vector.clone();
+    let mut vec_ordered = Vec::new();
+    let mut max = 0;
+    let mut index = 0; // index memorized inside the returned vector
+    let mut j = 0;
+
+    while vec_ordered.len() != vector.len() {
+        for elem in &vec_new {
+            if elem.len() > max {
+                max = elem.len();
+                index = j;
+            }
+            j = j + 1;
+        }
+        // j and max are reinitialized
+        j = 0;
+        max = 0;
+        // we add the index of the vector with the biggest size
+        vec_ordered.push(index);
+        // we substitute the vector with the biggest size with an empty vector
+        vec_new.remove(index);
+        vec_new.insert(index, Vec::new());
+    }
+    return vec_ordered;
+}
+
+
+
 pub fn interpret(job_man : &mut JobManager , inputs: Pairs<Rule> ) {
     let mut nb_thread: Option<usize> = None;
     let mut dry_run : bool = false;
     let mut keep_order : bool = false;
+    let mut vec_separator_values = Vec::new(); // contient les valeurs de chaque séparateur
 
     for pairs in inputs.next().unwrap().into_inner() {
         match pairs.as_rule() {
@@ -38,13 +73,13 @@ pub fn interpret(job_man : &mut JobManager , inputs: Pairs<Rule> ) {
                 //     }
                 // }
             }
-            Rule::separators => { () // <- to remove
-                // TODO : build all possible combinations
-
-                // println!("separator : {}", pairs.as_str());
-                // for input in pairs.into_inner().skip(1) {
-                //     println!("input : {}", input.as_str());
-                // }
+            Rule::separators => { 
+                // compter le nombre de séparateurs, on note s
+                let mut vec_separator = Vec::new();
+                for input in pairs.into_inner().skip(1) {
+                    vec_separator.push(input.as_str());
+                }
+                vec_separator_values.push(vec_separator);
             }
             // some rules are not reachable from main rule, 
             // that is totaly normal according to the grammar.
@@ -53,60 +88,38 @@ pub fn interpret(job_man : &mut JobManager , inputs: Pairs<Rule> ) {
         }
     }
 
+    // vec_ordered will contain the indexes of the vectors inside vec_separator_values classified from the biggest vector to the 
+    // smalest vector according to their sizes
+
+    let mut vec_ordered = orderer(vec_separator_values);
+                
+                // construire_jobs(o, 0 /*indice actuel dans o, pour récuperer le numéro de séparateur*/, 
+                //                 v, None /*liste des values pour un job*/)
+                // <- to remove
+                // TODO : build all possible combinations
+
+                // println!("separator : {}", pairs.as_str());
+                // for input in pairs.into_inner().skip(1) {
+                //     println!("input : {}", input.as_str());
+                // }
+
     job_man.set_exec_env(nb_thread, dry_run,keep_order);
 }
 
-// pub fn interpret(job_man : &mut JobManager , s: Vec<String> ) {
-//     let mut nb_thread: Option<usize> = None;
-//     let mut dry_run : bool = false;
-//     let mut keep_order : bool = false;
-    
-//     let mut optionInterpretation : bool = true;
-//     let mut commandInterpretation : bool = false;
-//     let mut valuesInterpretation : bool = false;
-    
-//     let mut jobVector : Vec<String> = Vec::new();
-//     let mut values : Vec<String> = Vec::new();
-    
-//     for i in 0..s.len() {
-//     let arg = s[i].clone();
-//     // Commande not yet interpreted
-//     if optionInterpretation {
-//     if arg == "--keep-order" {
-//     keep_order = true;
-//     } else if arg == "--dry-run" {
-//     dry_run = true;
-//     } else if arg == "--jobs" || arg == "-j" {
-//     let nb_str = s[i+1].clone();
-//     let result = nb_str.parse::<usize>();
-//     match result {
-//     Ok(u) => nb_thread = Some(u),
-//     Err(e) => {debug!("{}", e)}
-//     }
-//     } else if arg == ":::" {
-//     panic!("Syntax error ! Parsed ::: before command");
-//     } else {
-//     optionInterpretation = false;
-//     commandInterpretation = true;
-//     jobVector.push(arg); // Push of the command's name
-//     }
-//     // One command at least interpreted
-//     } else if commandInterpretation {
-//     if arg == ";" || arg == "|" {
-//     job_man.add_job(Job::new(&jobVector));
-//     jobVector = Vec::new();
-//     } else if arg == ":::" {
-//     job_man.add_job(Job::new(&jobVector));
-//     jobVector = Vec::new();
-//     commandInterpretation = false;
-//     valuesInterpretation= true;
-//     } else {
-//     jobVector.push(arg); // Push of the command's arguments
-//     }
-//     } else {
-//     values.push(arg);
-//     }
-//     }
-    
-//     job_man.set_exec_env(nb_thread, dry_run,keep_order);
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn orderer_test() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let mut vec_main = Vec::new();
+        vec_main.push(vec!["hi", "hi", "hi"]);
+        vec_main.push(vec!["hi", "hi"]);
+        vec_main.push(vec!["hi", "hi", "hi", "hi", "hi"]);
+        let order_vector = orderer(vec_main);
+        assert_eq!(order_vector[0], 2);
+        assert_eq!(order_vector[1], 0);
+        assert_eq!(order_vector[2], 1);
+    }
+}

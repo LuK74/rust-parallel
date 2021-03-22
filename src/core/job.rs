@@ -89,6 +89,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn job_cmd2() {
         let _ = env_logger::builder().is_test(true).try_init();
 
