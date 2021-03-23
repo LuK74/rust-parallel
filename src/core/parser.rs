@@ -8,7 +8,7 @@ use pest::iterators::Pairs;
 #[grammar = "core/parallel.pest"]
 pub struct ParallelParser;
 
-pub fn parse(raw_string: &String) -> Result<Pairs<Rule>, Error<Rule>> {   
+pub fn parse(raw_string: &str) -> Result<Pairs<Rule>, Error<Rule>> {   
     let parse_result = ParallelParser::parse(Rule::main, &raw_string);
     let inputs = match parse_result {
         Ok(pairs) => pairs,

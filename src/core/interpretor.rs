@@ -1,9 +1,7 @@
 use super::jobmanager::JobManager;
 
 // To see the avaible Rules & Pairs from the grammar:
-#[derive(Parser)]
-#[grammar = "core/parallel.pest"]
-pub struct ParallelParser;
+use super::parser::Rule;
 use pest::iterators::Pairs;
 
 // fn orderer (vector : Vec<Vec<&str>>) -> Vec<usize> {
@@ -32,7 +30,8 @@ use pest::iterators::Pairs;
 //     return vec_ordered;
 // }
 
-fn create_job(_command : String) {
+fn create_job(command : &str) {
+    println!("job created : '{}'", command);
 }
 
 /// Builds all the possible combinations according to sep_val values.
@@ -89,22 +88,22 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) {
     let mut keep_order : bool = false;
     let mut separators : Vec<Vec<&str>> = Vec::new();
     let mut combinations : Vec<Vec<&str>> = Vec::new();
-    let mut command_pattern : Option<Pairs<Rule>> = None;
+    let mut command_pairs : Option<Pairs<Rule>> = None;
 
     for pair in inputs.next()/*we skip "parallel" terminal term*/.unwrap().into_inner() {
         match pair.as_rule() {
             Rule::options => {
-                let opt = pair.as_str();
-                match opt {
+                let mut opt_iter = pair.as_str().split_whitespace();
+                match opt_iter.next().unwrap() {
                     "--keep-order" => keep_order = true,
                     "--dry-run" => dry_run = true,
-                    "--jobs" | "-j" => nb_thread = Some(pair.into_inner().next().unwrap().as_str().parse::<usize>().unwrap()), // never fails
+                    "--jobs" | "-j" => nb_thread = Some(opt_iter.next().unwrap().parse::<usize>().unwrap()), // never fails
                     "--pipe" => /*TODO*/(),
                     "--help" => /*TODO return*/(),
                     _ => unreachable!(),
                 }
             }
-            Rule::commands => command_pattern = Some(pair.into_inner()),
+            Rule::commands => command_pairs = Some(pair.into_inner()),
             Rule::separators => {
                 let mut separator = Vec::new();
                 for sep_value in pair.into_inner().skip(1)/*we skip the ":::" term*/ {
@@ -124,20 +123,40 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) {
     // build all possible combinations
     build_combinations(&mut combinations, &vec_ordered, 0, &separators, Vec::new());
 
-    // Create all jobs here
-    let mut pattern = command_pattern.unwrap(); // never fails
-    for _combination in combinations {
-        let mut command : String = String::from("");
-        for arg in &mut pattern {
-            let raw = String::from(arg.as_str());
-            command.push_str(match arg.into_inner().next().unwrap().as_rule() {
-                Rule::target => "", //TODO: get the job[i] corresponding to {i} 
-                Rule::quoted_char => "", //TODO: unquote the char
-                Rule::string => raw.as_str(),
-                _ => unreachable!(),
-            })
+    // Create all jobs here from the "commands" token
+    let mut pairs = command_pairs.unwrap(); // never fails
+    for combination in combinations {
+        //we push command name which is a string (so the call to unwrap will never fail)
+        let mut command : String = String::from(pairs.next().unwrap().as_str());
+        for pair in &mut pairs { // each pair is an argument
+            let raw = String::from(pair.as_str());
+            command.push_str(" ");
+            // to match rules target/quoted_char/string we need to go into arguments rule
+            let argument = match pair.into_inner().next().unwrap().as_rule() {
+                Rule::target => {
+                    let raw = raw.replace("{", "").replace("}", "");
+                    let target = raw.as_str();
+                    let mut result = String::from("");
+                    match target {
+                        // if there is no specified target, we do the same as GNU parallel does
+                        // which is considering it as an orderer target list of every possible
+                        // target separated by spaces. 
+                        // (see an example by running : "parallel echo {}{} ::: 1 2 3 ::: a b c")
+                        "" => for value in &combination {
+                            result.push_str(value);
+                            if combination.last().unwrap() != value { result.push_str(" "); }
+                        }
+                        _ => result.push_str(combination[raw.parse::<usize>().unwrap()/*never fails*/]),
+                    }
+                    result
+                }
+                Rule::quoted_char => raw.replace("'", ""),
+                Rule::string => raw,
+                _ => unreachable!(), // no other rules in arguments
+            };
+            command.push_str(argument.as_str());
         }
-        create_job(command);
+        create_job(&command);
     }
 
     job_man.set_exec_env(nb_thread, dry_run, keep_order);
@@ -166,6 +185,9 @@ mod tests {
 
     #[test]
     fn builder_test1() {
+        let mut jm = JobManager::new();
+        let mut parsing_result = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';' wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
+        interpret(&mut jm, &mut parsing_result);
     }
 
     #[test]
