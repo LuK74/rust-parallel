@@ -5,11 +5,30 @@ use tokio::process::Command;
 use std::thread;
 use std::process;
 
+/**
+ * Representation of the command execution environment :
+ * - `cmd : String` - linux command name
+ * - `parameter: Vec<String>` - list of command parameters
+ * # Example
+ * ```rust
+ * use rust_parallel::core::job::Job;
+ * let args: Vec<String> = vec![
+ *             String::from("echo"),
+ *             String::from("Hello"),
+ *             String::from("World"),
+ *         ];
+ * let job : Job = Job::new(args)
+ * job.exec();
+ * ```
+ */
 pub struct Job {
     cmd: String,
     parameter: Vec<String>,
 }
 
+/***
+ * Allow to display all information about the current job. 
+ */
 impl fmt::Display for Job {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let _r = write!(
@@ -25,8 +44,16 @@ impl fmt::Display for Job {
 }
 
 impl Job {
+    /**
+     * Return a new job set with the given parameter.
+     * # Attributs
+     * - `args: Vec<String>` - list of word use in the command
+     */
     pub fn new(args: Vec<String>) -> Job {
+        // the first element of the list is the linux command name
         let cmd = args[0].clone();
+
+        // the others element of the list are the command parameters
         let mut parameter: Vec<String> = vec![];
         for i in 1..args.len() {
             parameter.push(args[i].clone());
@@ -35,17 +62,32 @@ impl Job {
         Job { cmd, parameter }
     }
 
+    /**
+     * Execute the current job.
+     * # Return
+     * either the standard output if the execution was successful or an error.
+     */
     pub async fn exec(&mut self) -> Result<process::Output, Box<dyn std::error::Error>> {
         debug!("{} {:?}",process::id(), thread::current().id());
+
+        // Create a new tokio command with the linux command name
         let mut command: Command = Command::new(self.cmd.clone());
+
+        // Add parameters to the command
         for arg in &self.parameter {
             command.arg(&arg.clone());
         }
 
+        // A future is a value that may not have finished computing yet. 
+        // This kind of "asynchronous value" makes it possible for a thread to continue doing useful work 
+        // while it waits for the value to become available.
         let future = command.output();
         debug!("<{}> spawn", self);
+
+        // Wait for the result of the command execution
         let output : process::Output = future.await?;
 
+        // if there was no error during execution then the output is returned
         Ok(output)
     }
 }

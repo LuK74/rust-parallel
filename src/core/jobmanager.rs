@@ -8,6 +8,26 @@ use std::process;
 use tokio::sync::mpsc;
 use futures::future;
 
+/**
+ * Representation of the command execution environment :
+ * - `cmds : Vec<Job>` - the list of commands to be executed 
+ * - `nb_thread : Option<usize>` - the number of threads to be used in the execution environment
+ * - `dry_run : bool` - execution parameter allowing only to display the commands without executing them
+ * - `keep_order : bool` - execution parameter allowing to display the returns of the commands in the execution order given in input
+ * # Example
+ * ```rust
+ * use rust_parallel::core::jobmanager::JobManager;
+ * let mut jobmanager : JobManager = Jobmanager::new();
+ * jobmanager.set_exec_env(Some(5), false, true); //5 threads, no "dry run", keep order
+ * let args: Vec<String> = vec![
+ *             String::from("echo"),
+ *             String::from("Hello"),
+ *             String::from("World"),
+ *         ];
+ * jobmanager.add_job(Job::new(args));
+ * jobmanager.exec()
+ * ```
+ */
 pub struct JobManager {
     cmds: Vec<Job>,
     nb_thread: Option<usize>,
@@ -15,6 +35,9 @@ pub struct JobManager {
     keep_order : bool
 }
 
+/***
+ * Allow to display all information about the current job manager. 
+ */
 impl fmt::Display for JobManager {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let _r = write!(f, "Runtime with {:?} threads", self.nb_thread);
@@ -26,6 +49,14 @@ impl fmt::Display for JobManager {
 }
 
 impl JobManager {
+    /**
+     * Return a new job manager with default values of the execution parameters.
+     * # Attributs
+     * - `cmds` - is initialized and empty
+     * - `nb_thread` - None
+     * - `dry_run` - false
+     * - `keep_order` - false
+     */
     pub fn new() -> JobManager {
         JobManager {
             cmds: vec![],
@@ -35,16 +66,39 @@ impl JobManager {
         }
     }
 
+    /**
+     * Allows to add the given job to the current job manager.
+     * # Arguments 
+     * - `job` - A Job you want to add
+     */
     pub fn add_job(&mut self, job: Job) {
         self.cmds.push(job);
     }
 
+    /**
+     * Allows to change the default values of the execution parameters.
+     * # Arguments
+     * - `nb` - to change the number of thread
+     * - `d_r` - to change *dry run* value
+     * - `k_o` - to change *keep order* value
+     * # Additional information
+     * `d_r` and `k_o` can take true|false values.
+     * `nb` can take Some(uzise)|None values but in case of Some(0) the value realy given to the manager is None
+     */
     pub fn set_exec_env (&mut self, nb : Option<usize>, d_r : bool, k_o : bool) {
-        self.nb_thread = nb;
+        self.nb_thread = match nb {
+            None|Some(0) => None,
+            Some(_) => nb
+        };
         self.dry_run = d_r;
         self.keep_order = k_o;
     }
 
+    /**
+     * Allows to execute all the commands in according to the execution parameters.
+     * 
+     * In case dry run is requested, then the other parameters are not very useful, we only display the commands.
+     */
     pub fn exec(&mut self) {
         if self.dry_run {
             self.dry_run();
@@ -53,15 +107,29 @@ impl JobManager {
         }
     }
 
+    /**
+     * Private function.
+     * 
+     * Display the list of command.
+     */
     fn dry_run(&mut self){
         for i in 0..self.cmds.len() {
             println!("{}", self.cmds[i]);
         }
     }
 
+    /**
+     * Private function.
+     * 
+     * Execute the list of command (with the requested number of threads), gives them an order 
+     * and asynchronously retrieve the standard output of the threads in order to display them 
+     * (using the order if requested)
+     */
     fn exec_all(&mut self){
         debug!("{} {:?}",process::id(), thread::current().id());
         
+        // Create a asynchronous tokio runtime with the given number of thread.
+        // Threads work as consumer producers
         let mut runtime_builder: Builder = Builder::new_multi_thread();
         runtime_builder.enable_all();
         let runtime: Runtime = match self.nb_thread {
@@ -71,23 +139,37 @@ impl JobManager {
 
         let nb_cmd = self.cmds.len();
 
+        // Run all command into the runtime previously created.
         runtime.block_on(async {
             debug!("{} {:?}",process::id(), thread::current().id());
             debug!("start block_on");
 
+            // Allows to keep access to the different tasks given to the threads.
             let mut tasks : Vec<JoinHandle<_>> = vec![];
+
+            // mpsc = multi producer single consumer
+            // allow to the main thread to retrieve the output of child threads
             let (tx, mut rx) = mpsc::channel::<(i32,process::Output)>(1);
+
+            // allows to keep the execution order
             let mut order : i32 = 0;
+
+            // for each command/job
             for mut cmd in self.cmds.drain(..){
+                // create new producer
                 let tx_task = tx.clone();
+
+                // gives a new task to the runtime which executes the command and get output asynchronoulsy
                 let task = tokio::spawn(async move {
-                    let res = cmd.exec().await.unwrap();
-                    tx_task.send((order,res)).await.unwrap();
+                    let output = cmd.exec().await.unwrap();
+                    tx_task.send((order,output)).await.unwrap();
                 });
                 tasks.push(task);
                 order+=1;
             }
 
+            // allows to wait for the output of all commands and to store them 
+            // either in the order of arrival or in the order of execution (if requested => keep order)
             let mut counter : usize = 0;
             let mut messages = vec![Default::default(); nb_cmd];
             while counter < nb_cmd {
@@ -101,6 +183,7 @@ impl JobManager {
                 counter += 1;
             }
 
+            // display output message
             for i in 0..messages.len() {
                 println!("GOT = {}", messages[i]);
             }
