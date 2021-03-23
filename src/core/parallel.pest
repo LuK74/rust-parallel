@@ -22,11 +22,11 @@ arguments = { target
             | quoted_char 
             | string } 
 
-target = { "{" ~ ASCII_DIGIT* ~ "}" }
+target = @{ "{" ~ ASCII_DIGIT* ~ "}" }
 
-quoted_char = { "'" ~ ANY ~ "'" }
+quoted_char = @{ "'" ~ ANY ~ "'" }
 
-separator = { ":::" } // to extend in future needs
+separator = @{ ":::" } // to extend in future needs
 
 separators = { separator ~ input+ }
 
