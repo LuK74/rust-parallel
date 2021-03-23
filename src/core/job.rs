@@ -5,7 +5,6 @@ use tokio::process::{Child, Command};
 use std::thread;
 use std::process;
 use std::process::Stdio;
-use tokio::io;
 
 pub struct Job {
     cmd: String,
@@ -48,7 +47,7 @@ impl Job {
         // debug!("<{}> spawn", self);
 
         let mut child : Child = command.stdout(Stdio::piped()).spawn()?;
-        let mut stdout = child.stdout.take().unwrap();
+        let mut _stdout = child.stdout.take().unwrap();
         // let result: Vec<_> = io::BufReader::new(stdout)
         // .lines
         // .inspect(|s| println!("> {:?}", s))
@@ -96,7 +95,7 @@ mod tests {
         let runtime = init(Some(5));
 
         runtime.block_on(async {
-            let cmd : Child = Command::new(String::from("echo Hello World"))
+            let _cmd : Child = Command::new(String::from("echo Hello World"))
                 .spawn()
                 .unwrap();
         });
