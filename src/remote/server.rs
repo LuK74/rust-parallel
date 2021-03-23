@@ -4,61 +4,99 @@ use tokio::net::TcpStream;
 
 use std::error::Error;
 
-use std::fs::{self, DirBuilder, File};
-use std::io::Write;
 use std::fs::OpenOptions;
+use std::fs::{self, DirBuilder};
+use std::io::Write;
 
-
+use log::debug;
 
 use crate::remote::channel::*;
 
 pub struct ParallelServer {
+    // Passive socket listening for Client request
     listener: TcpListener,
+
+    // Name of the temporary directory used to store
+    // the files needed by the server to execute the requests
+    tmp_dir: String,
 }
 
 impl ParallelServer {
+    // ParralelServer constructor
+    // Will launch the passive socket and create the temporary directory
     pub async fn new(server_address: String) -> Self {
+        // Creation of the passive Socket
         let res_bind = TcpListener::bind(server_address.clone()).await;
         let listener: TcpListener;
 
+        let tmp_dir = String::from("tmp/");
+
+        // If the TcpListener::bind() method return an Ok result
+        // it means that the bind succeed and that we can retrieve
+        // the TcpListener
         if let Ok(l) = res_bind {
             listener = l;
         } else {
             panic!("Couldn't bind the server to the address {}", server_address);
         }
 
-        if let Err(e) = DirBuilder::new().create("tmp") {
-            println!("{:?}", e);
-        } else {
-            assert!(fs::metadata("tmp").unwrap().is_dir());
+        // Try to create the temporary directory
+        // It is not an "actual" error if this returns an error AlreadyExists
+        if let Err(e) = DirBuilder::new().create(tmp_dir.clone()) {
+            if e.kind() != std::io::ErrorKind::AlreadyExists {
+                debug!("{:?}", e);
+                panic!("Couldn't create temporary directory");
+            } else {
+                debug!("Temporary dir already exists, {}", e);
+            }
         }
 
-        ParallelServer { listener }
+        // Check that the tmp_dir is a directory
+        assert!(fs::metadata(tmp_dir.clone()).unwrap().is_dir());
+
+        ParallelServer { listener, tmp_dir }
     }
 
+    // Listening loop
+    // Will listening to every client request and create a
+    // ParallelWorker for each one
+    // Each of this ParallelWorker will do his job in his own
+    // thread
     pub async fn waiting_request(&mut self) {
         loop {
+            let tmp_dir = self.tmp_dir.clone();
             if let Ok((s, _)) = self.listener.accept().await {
-                tokio::spawn(async {
-                    ParallelWorker::process(s).unwrap();
+                tokio::spawn(async move {
+                    ParallelWorker::process(s, tmp_dir).unwrap();
                 });
-
                 continue;
             } else {
-                panic!("Error while accepting connection request");
+                // Panic isn't necessarily needed here
+                // We don't want our Server to stop only because
+                // of one Client that may have kill his Client before
+                // the accept process ended (for more information we
+                // would need to look the TcpListener implementation)
+                // Using the macro panic!() could result in an
+                // Denial Of Service exploit
+                println!("Error while accepting connection request");
             }
         }
     }
 }
 
+// Basic exchange Test
 pub async fn test_exchange() -> Result<(), Box<dyn Error>> {
     let mut server: ParallelServer = ParallelServer::new(String::from("127.0.0.1:4000")).await;
-    println!("Server opened on port 4000");
+    debug!("Server opened on port 4000");
 
     server.waiting_request().await;
     Ok(())
 }
 
+// Enum used to know the current state of a Worker
+// Due to the fact that a Worker will need to retrieve several
+// types of informations and not necessarily in the same way each time,
+// the use of a state is well suited
 pub enum WorkerState {
     Idle,
     WaitingFileName,
@@ -68,48 +106,65 @@ pub enum WorkerState {
 }
 
 pub struct ParallelWorker {
+    // Result of the request execution
     request_result: String,
+    // Request asked by the Client
     request: String,
 
+    // Path of the temporary directory
     tmp_dir: String,
+    // Name of the files sent by the Client
+    // and their actual path
+    // Exemple : File toto.txt sent by the Client
+    // (toto.txt, "/tmp/toto.txt")
+    // if the tmp_dir variable is set to "/tmp/"
     files: Vec<(String, String)>,
 
+    // State of the worker
     state: WorkerState,
+    // Name of the file currently transfered
     current_file: String,
 }
 
 impl ParallelWorker {
-    pub fn new() -> Self {
+    // ParallelWorker constructor
+    pub fn new(tmp_dir: String) -> Self {
         ParallelWorker {
             request_result: String::new(),
             request: String::new(),
-            tmp_dir: "tmp/".to_string(),
+            tmp_dir,
             files: Vec::new(),
             state: WorkerState::Idle,
             current_file: String::new(),
         }
     }
 
-    pub fn process(socket: TcpStream) -> Result<String, String> {
-        let mut worker = ParallelWorker::new();
+    // Given a TcpStream and the path to the temporary directory
+    // This method will create and start a ParallelWorker
+    // It will also retrieve the result and return it
+    pub fn process(socket: TcpStream, tmp_dir: String) -> Result<String, String> {
+        let mut worker = ParallelWorker::new(tmp_dir);
         let result_work = worker.start_worker(socket);
 
         if let Ok(res) = result_work {
             return Ok(res);
         } else {
-            println!("Error occured during worker job");
+            debug!("Error occured during worker job");
             return result_work;
         }
     }
 
+    // Method used to start a worker
+    // It will create and set the Channel used for the exchange
     pub fn start_worker(&mut self, socket: TcpStream) -> Result<String, String> {
+        // Channel creation
         let mut channel: Channel = Channel::new(socket);
 
+        // Preparation of the channel
         channel.set_listener(self);
         channel.set_interest(Ready::READABLE);
 
-        // Should spawn a thread to do this work
-        // Result isn't correctly handled yet
+        // Start of the exchange loop
         channel.exchange_loop().unwrap();
 
         Ok(self.request_result.clone())
@@ -119,83 +174,132 @@ impl ParallelWorker {
 impl ChannelListener for ParallelWorker {
     fn received(&mut self, buffer: Vec<u8>) -> Option<Vec<u8>> {
         let response = String::from_utf8(buffer).unwrap();
-        //println!("-- Server received : {}", response);
+        debug!("-- Server received : {}", response);
 
-        if response.eq("Sending files") {
-            self.state = WorkerState::WaitingFileName;
-            return Some("Waiting for new file".bytes().collect());
-        } else if response.eq("No more files") || response.eq("Sending request") {
-            self.state = WorkerState::WaitingRequest;
-            return Some("Ready for request".bytes().collect());
-        } else {
-            println!("changing State");
-            match &self.state {
-                WorkerState::Idle => {
-                    println!("Unexpected behaviour");
+        match &self.state {
+            WorkerState::Idle => {
+                if response.eq("Sending files") {
+                    // Response "Sending files" means that the Client is going to send
+                    // us files needed for the request execution
+                    self.state = WorkerState::WaitingFileName;
+                    return Some("Waiting for new file".bytes().collect());
+                } else if response.eq("Sending request") {
+                    // Response "Sending request" means that the Client is going to send
+                    // us the request
+                    self.state = WorkerState::WaitingRequest;
+                    return Some("Ready for request".bytes().collect());
+                } else {
+                    println!("Unexepected behaviour, shouldn't be in a IDLE state");
+                    return None;
                 }
-                WorkerState::WaitingFileName => {
+            }
+            WorkerState::WaitingFileName => {
+                if response.eq("No more files") {
+                    // Response "No more files" means that the Client has no more
+                    // files to send us, we can now ask for the request
+                    self.state = WorkerState::WaitingRequest;
+                    return Some("Ready for request".bytes().collect());
+                } else {
+                    // If Response isn't equals to any pre-defined message
+                    // We can assume that he sent us a filename
+                    // We'll save this filename and ask for the file data
                     self.current_file = response;
                     self.state = WorkerState::WaitingFileData;
                     return Some("Ready for next file".bytes().collect());
                 }
-                WorkerState::WaitingFileData => {
-                    let mut extension = String::from("");
-                    let mut current_number = 0;
-
-                    let mut result = OpenOptions::new().write(true)
-                    .create_new(true)
-                    .open(self.tmp_dir.clone() + &self.current_file + &extension[..]);
-
-                    while let Err(e) = &result {
-                        if e.kind() == std::io::ErrorKind::AlreadyExists {
-                            current_number += 1;
-                            extension = format!("({})", current_number);
-                            result = OpenOptions::new().write(true)
-                    .create_new(true)
-                    .open(self.tmp_dir.clone() + &self.current_file + &extension[..]);
-                        } else {
-                            println!("{:?}",e);
-                            panic!("Unexpected behaviour");
-                        }
-                    }
-
-                    let mut file = result.unwrap();
-
-                    let buf : &[u8] = &response.bytes().collect::<Vec<u8>>()[..];
-
-                    file.write_all(buf).unwrap();
-                    file.sync_data().unwrap();
-
-                    self.files.push((
-                        self.current_file.clone(),
-                        self.tmp_dir.clone() + "/" + &self.current_file + &extension[..],
-                    ));
-                    self.state = WorkerState::WaitingFileName;
-                    return Some("Waiting for new file".bytes().collect());
-                }
-                WorkerState::WaitingRequest => {
-                    self.request = response;
-                    // handle the request and send the result
-
-                    // put the request result in this variable
-                    println!("Server : request received : {}", self.request);
-                    self.request_result = self.request.clone();
-                    println!("Server : result of request : {}", self.request_result);
-
-                    self.state = WorkerState::SendingResult;
-                    return Some(self.request_result.bytes().collect());
-                },
-                _ => panic!("Shoudln't happened"),
             }
+            WorkerState::WaitingFileData => {
+                // In this state we're supposed to retrieve the file data
+                // and to create a temporary file, in order for the server to use
+                // those data for the request execution
+                let mut extension = String::from("");
+                let mut current_number = 0;
 
-            return None;
+                // We start by tring to create a temporary file with the same name
+                // as the initial file
+                let mut result = OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(self.tmp_dir.clone() + &self.current_file + &extension[..]);
+
+                while let Err(e) = &result {
+                    // If the file creation didn't work due to an AlreadyExists error
+                    // we'll try to add en version extension to the file
+                    // Example : Client sent "toto.txt" which already exists in our
+                    // temporary directory
+                    // So we'll try to save the data in a file named "toto.txt(1)"
+                    // If this still doesn't work, will increment the version number by one
+                    // until it works
+                    if e.kind() == std::io::ErrorKind::AlreadyExists {
+                        current_number += 1;
+                        extension = format!("({})", current_number);
+                        result = OpenOptions::new()
+                            .write(true)
+                            .create_new(true)
+                            .open(self.tmp_dir.clone() + &self.current_file + &extension[..]);
+                    // If the error isn't an AlreadyExists error, we'll panic
+                    } else {
+                        debug!("{:?}", e);
+                        panic!(
+                            "Unexpected behaviour, couldn't create the temporary file for {}",
+                            self.current_file
+                        );
+                    }
+                }
+
+                // The use of unwrap here is safe due to our previous while loop
+                let mut file = result.unwrap();
+
+                // Write the data on the file and sync it
+                let buf: &[u8] = &response.bytes().collect::<Vec<u8>>()[..];
+
+                if let Err(_) = file.write_all(buf) {
+                    panic!("Couldn't write the data in the temporary file");
+                }
+
+                if let Err(_) = file.sync_data() {
+                    panic!("Couldn't save the data in the temporary file");
+                }
+
+                // Push the couple (Filename, Filepath) in the vec contained in the
+                // ParallelWorker struct
+                self.files.push((
+                    self.current_file.clone(),
+                    self.tmp_dir.clone() + "/" + &self.current_file + &extension[..],
+                ));
+
+                // Return in the state waiting for a filename or for a message telling
+                // that there is no more file to transfer
+                self.state = WorkerState::WaitingFileName;
+                return Some("Waiting for new file".bytes().collect());
+            }
+            WorkerState::WaitingRequest => {
+                self.request = response;
+                // handle the request and send the result
+
+                // !!! insert here the method executing the request !!! //
+
+                // put the request result in this variable
+                println!("Server : request received : {}", self.request);
+                self.request_result = self.request.clone();
+                println!("Server : result of request : {}", self.request_result);
+
+                self.state = WorkerState::SendingResult;
+                return Some(self.request_result.bytes().collect());
+            }
+            _ => panic!("Shoudln't happened"),
         }
     }
 
+    // Called when a message has been sent
     fn sent(&mut self) -> Option<()> {
         match &self.state {
+            // If we were in the SendingResult it means that
+            // we sent the last message that our ParallelWorker was
+            // supposed to send
+            // So we can return None, in order to end the Channel
             WorkerState::SendingResult => return None,
-            _ => return Some(())
+            _ => return Some(()),
         }
     }
 }
