@@ -369,4 +369,25 @@ mod tests {
 
         debug!("end test");
     }
+
+    #[test]
+    fn test_notpanick() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    
+        let mut jobmanager = init_jm(NB_THREAD, false, false);
+    
+        let args: Vec<String> = vec![
+            String::from("echo"),
+            String::from("-e"),
+            String::from("'Hello\nWorld'"),
+        ];
+        jobmanager.add_job(Job::new(args));
+    
+        let args: Vec<String> = vec![
+            String::from("unknown"),
+        ];
+        jobmanager.add_job(Job::new(args));
+    
+        jobmanager.exec();
+    }
 }

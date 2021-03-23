@@ -137,4 +137,18 @@ mod tests {
         });
 
     }
+
+    #[test]
+    #[should_panic]
+    fn job_cmd3() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let runtime = init(Some(5));
+
+        runtime.block_on(async {
+            let _cmd : Child = Command::new(String::from("unknown_cmd"))
+                .spawn()
+                .unwrap();
+        });
+    }
 }

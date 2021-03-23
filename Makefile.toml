@@ -35,3 +35,8 @@ args = ["test", "jobmanager_thread", "--", "--show-output"]
 env = {"RUST_BACKTRACE"="full","RUST_LOG"="debug"}
 command = "cargo"
 args = ["test", "job_cmd", "--", "--show-output"]
+
+[tasks.test_np]
+env = {"RUST_BACKTRACE"="full","RUST_LOG"="debug"}
+command = "cargo"
+args = ["test", "test_notpanick", "--", "--show-output"]
