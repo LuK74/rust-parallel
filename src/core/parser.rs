@@ -20,7 +20,6 @@ pub fn parse(raw_string: &String) -> Result<Pairs<Rule>, Error<Rule>> {
     return Ok(inputs);
 
     // let inputs = inputs.next().unwrap(); // get and unwrap the `main` rule; never fails
-
     // for pairs in inputs.into_inner() {
     //     match pairs.as_rule() {
     //         Rule::options => println!("option : {}", pairs.as_str()),
@@ -48,6 +47,5 @@ pub fn parse(raw_string: &String) -> Result<Pairs<Rule>, Error<Rule>> {
     //         _ => unreachable!(),
     //     }
     // }
-
     // return Ok(inputs);
 }
