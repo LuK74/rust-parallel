@@ -198,7 +198,7 @@ impl JobManager {
 
             // display output message
             for i in 0..messages.len() {
-                println!("GOT = {}", messages[i]);
+                print!("{}", messages[i]);
             }
 
             future::join_all(tasks).await;

@@ -160,11 +160,9 @@ fn create_all_jobs(job_man : &mut JobManager, combinations : &Vec<Vec<&str>>, co
         let open_braces = command.find('{').unwrap_or(0);
         let close_braces = command.find('}').unwrap_or(0);
         if open_braces < close_braces {
-            let braces_content = command[open_braces+1..close_braces].parse::<usize>();
-            match braces_content {
-                Ok(_)  => target_exists = true,
-                _ => target_exists = false,
-            }
+            // braces exists in a good order, but the 
+            // content will be checked after in the while loop
+            target_exists = true; 
         }
 
         if !target_exists {

@@ -13,7 +13,6 @@ pub fn parse(raw_string: &str) -> Result<Pairs<Rule>, Error<Rule>> {
     let inputs = match parse_result {
         Ok(pairs) => pairs,
         Err(error) => {
-            eprintln!("The arguments entered are incorrect.");
             return Err(error);
         }
     };
