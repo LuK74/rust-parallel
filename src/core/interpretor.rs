@@ -22,7 +22,8 @@ fn create_job(command : &str) {
 /// - depth: the depth in sep_ord (up to sep_val.len() - 1)
 /// - sep_val: contains all the values of each separator
 /// - curr_build: the current building combination of values
-fn build_combinations<'a>(builds: &mut Vec<Vec<&'a str>>, sep_ord: & Vec<usize>, depth: usize, sep_val: & Vec<Vec<&'a str>>, curr_build: Vec<&'a str>) {
+fn build_combinations<'a>(builds: &mut Vec<Vec<&'a str>>, sep_ord: & Vec<usize>, 
+                          depth: usize, sep_val: & Vec<Vec<&'a str>>, curr_build: Vec<&'a str>) {
     for i_value in 0..sep_val[sep_ord[depth]].len() {
         let mut build = curr_build.clone();
         let value = sep_val[sep_ord[depth]][i_value];
@@ -67,7 +68,6 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
     let mut dry_run : bool = false;
     let mut keep_order : bool = false;
     let mut separators : Vec<Vec<&str>> = Vec::new();
-    let mut combinations : Vec<Vec<&str>> = Vec::new();
     let mut command_pattern : String = String::from("");
 
     for pair in inputs.next().unwrap()/*safe to unwrap the main rule as it will never fail*/.into_inner() {
@@ -107,67 +107,79 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
         }
     }
 
-    // TODO : explain why we need this
-    let vec_ordered = orderly_sorter(&separators);
 
-    // build all possible combinations from separators values
-    build_combinations(&mut combinations, &vec_ordered, 0, &separators, Vec::new());
+    if separators.len() > 0 {
+        // to properly imbricate the loops that will be used to create 
+        // all the possible combinations, we must sort a vector to know 
+        // which separator to look first, then second, and so on ... 
+        let vec_ordered = orderly_sorter(&separators);
 
-    // Create all jobs here from the command's pattern
-    for combination in combinations {
-        // we un-quote special characters.
-        let mut command = command_pattern.replace("'", "");
+        // a vector that will contain all possible combinations
+        let mut combinations : Vec<Vec<&str>> = Vec::new();
+        // build all possible combinations from separators values
+        build_combinations(&mut combinations, &vec_ordered, 0, &separators, Vec::new());
 
-        // in parallel, having *no targets* or a *"{}"* target while having 
-        // one or multiple seprators has the same behaviour has "{1}" for 
-        // one separator, "{1} {2}" for two separators, "{1} {2} {3}" for
-        // three separators, etc.
-        let mut combo = String::from("");
-        for value in &combination {
-            combo.push_str(value);
-            if combination.last().unwrap() != value { combo.push(' '); }
-        }
+        // Create all jobs here from the command's pattern
+        for combination in combinations {
+            // we un-quote special characters.
+            let mut command = command_pattern.replace("'", "");
 
-        // we check if actual targets exist
-        let mut target_exists = false;
-        let open_braces = command.find('{').unwrap_or(0);
-        let close_braces = command.find('}').unwrap_or(0);
-        if open_braces < close_braces {
-            let braces_content = command[open_braces+1..close_braces].parse::<usize>();
-            match braces_content {
-                Ok(_)  => target_exists = true,
-                _ => target_exists = false,
+            // in parallel, having *no targets* or a *"{}"* target while having 
+            // one or multiple seprators has the same behaviour has "{1}" for 
+            // one separator, "{1} {2}" for two separators, "{1} {2} {3}" for
+            // three separators, etc.
+            let mut combo = String::from("");
+            for value in &combination {
+                combo.push_str(value);
+                if combination.last().unwrap() != value { combo.push(' '); }
             }
-        }
 
-        if !target_exists {
-            command.push(' ');
-            command.push_str(combo.as_str());
-        } else {
-            command = command.replace("{}", combo.as_str());
-            // If we encounter special targets like "{1}" we replace them with
-            // the right value of the combination.
-            while target_exists {
-                let open_braces = command.find('{').unwrap_or(0);
-                let close_braces = command.find('}').unwrap_or(0);
-                if open_braces < close_braces {
-                    let braces_content = command[open_braces+1..close_braces].parse::<usize>();
-                    match braces_content {
-                        Ok(value)  => {
-                            if value <= combination.len() {
-                                command.replace_range(open_braces..=close_braces, combination[value - 1]);
-                            } else {
-                                target_exists = false;
-                            }
-                        }
-                        _ => target_exists = false,
-                    }
-                } else {
-                    target_exists = false;
+            // we check if actual targets exist
+            let mut target_exists = false;
+            let open_braces = command.find('{').unwrap_or(0);
+            let close_braces = command.find('}').unwrap_or(0);
+            if open_braces < close_braces {
+                let braces_content = command[open_braces+1..close_braces].parse::<usize>();
+                match braces_content {
+                    Ok(_)  => target_exists = true,
+                    _ => target_exists = false,
                 }
             }
+
+            if !target_exists {
+                command.push(' ');
+                command.push_str(combo.as_str());
+            } else {
+                command = command.replace("{}", combo.as_str());
+                // If we encounter special targets like "{1}" we replace them with
+                // the right value of the combination.
+                while target_exists {
+                    let open_braces = command.find('{').unwrap_or(0);
+                    let close_braces = command.find('}').unwrap_or(0);
+                    if open_braces < close_braces {
+                        let braces_content = command[open_braces+1..close_braces].parse::<usize>();
+                        match braces_content {
+                            Ok(value)  => {
+                                if value <= combination.len() {
+                                    command.replace_range(open_braces..=close_braces, combination[value - 1]);
+                                } else {
+                                    // the value is above the separator's index
+                                    // ex : specifying target {3} while only 
+                                    //      two dimensions were specified.
+                                    target_exists = false;
+                                }
+                            }
+                            // an error occured while parsing the usize
+                            _ => target_exists = false,
+                        }
+                    } else {
+                        // no valid braces found !
+                        target_exists = false;
+                    }
+                }
+            }
+            create_job(&command);
         }
-        create_job(&command);
     }
 
     job_man.set_exec_env(nb_thread, dry_run, keep_order);
