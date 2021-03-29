@@ -126,12 +126,12 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
     job_man.set_exec_env(nb_thread, dry_run, keep_order);
 }
 
-fn create_job(job_man : &JobManager, command : &str) {
+fn create_job(job_man : &mut JobManager, command : &str) {
     let job = Job::new(command.split_whitespace().map(String::from).collect());
     job_man.add_job(job);
 }
 
-fn create_all_jobs(job_man : &JobManager, combinations : &Vec<Vec<&str>>, command_pattern : String) {
+fn create_all_jobs(job_man : &mut JobManager, combinations : &Vec<Vec<&str>>, command_pattern : String) {
     for combination in combinations {
         // we un-quote special characters.
         let mut command = command_pattern.replace("'", "");
