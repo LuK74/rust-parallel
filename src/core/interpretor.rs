@@ -14,6 +14,7 @@ use pest::iterators::Pairs;
 /// parallel that the parser can not see. Returned by using the function
 /// interpret.
 pub enum InterpretError {
+    Help,
     NoData(String),
 }
 
@@ -84,6 +85,7 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
                     // Never fails because the parse succeeded.
                     "--jobs" | "-j" => nb_thread = Some(opt_iter.next().unwrap().parse::<usize>().unwrap()),
                     "--pipe" => /*has no effect yet.*/(),
+                    "--help" => return Err(InterpretError::Help),
                     _ => unreachable!(),
                 }
             }
@@ -247,6 +249,17 @@ mod tests {
         let mut parsing_result6 = super::super::parser::parse("parallel echo :::").unwrap();
         match interpret(&mut jm, &mut parsing_result6) {
             Err(InterpretError::NoData(_)) => (),
+            _ => panic!()
+        }
+    }
+
+    #[test]
+    fn builder_test3() {
+        let mut jm = JobManager::new();
+        // "parallel --help echo ::: 1 2 3" Must pass throught parsing but not interpretation
+        let mut parsing_result6 = super::super::parser::parse("parallel --help echo ::: 1 2 3").unwrap();
+        match interpret(&mut jm, &mut parsing_result6) {
+            Err(InterpretError::Help) => (),
             _ => panic!()
         }
     }
