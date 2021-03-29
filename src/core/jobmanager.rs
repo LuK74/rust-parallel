@@ -186,10 +186,9 @@ impl JobManager {
                 };
 
                 if self.keep_order {
-                    debug!("order {}", order);
-                    messages.insert(order as usize, message);
+                    messages[order as usize] = message;
                 }else{
-                    messages.insert(counter, message);
+                    messages[counter] = message;
                 }
                 counter += 1;
             }
