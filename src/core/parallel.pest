@@ -12,7 +12,8 @@ options = {
 | ^"--keep-order" 
 | ^"--pipe" 
 | ^"--jobs" ~ ASCII_DIGIT+ 
-| ^"-j" ~ ASCII_DIGIT+
+| ^"-j" ~ ASCII_DIGIT+ 
+| ^"--help" 
 }
 
 commands = { string ~ arguments* }

@@ -85,8 +85,3 @@ fn test_interpretor() {
 
     println!("{}", jm);
 }
-
-#[test]
-fn test_parser() {
-    parser::parse(String::from("paralll --jobs 5 --dry-run echo -i {1}{} ok';' wc -l ::: 1 2 3 ::: 4 5 6"));
-}
