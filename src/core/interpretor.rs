@@ -136,6 +136,7 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
 }
 
 fn create_job(job_man : &mut JobManager, command : &str) {
+    // the job will be executed in the given shell from the job_manager.
     let mut new_shell_job = vec![String::from(job_man.shell.as_str())];
     new_shell_job.push(String::from("-c"));
     new_shell_job.push(String::from(command));
