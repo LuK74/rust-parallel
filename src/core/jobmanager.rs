@@ -1,4 +1,3 @@
-use std::error::Error;
 use super::job::Job;
 use log::debug;
 use std::fmt;
@@ -174,24 +173,25 @@ impl JobManager {
             let mut counter : usize = 0;
             let mut messages = vec![Default::default(); nb_cmd];
             while counter < nb_cmd {
-                let (order, message) = rx.recv().await.unwrap();
-                match message {
+                let (order, result) = rx.recv().await.unwrap();
+                let message: String = match result {
                     Ok(output) => {
-                        println!("ok");
-                        if self.keep_order {
-                            debug!("order {}", order);
-                            messages.insert(order as usize, String::from_utf8(output.stdout.clone()).unwrap());
+                        if output.status.success() {
+                            String::from_utf8(output.stdout.clone()).unwrap()
                         }else{
-                            messages.insert(counter, String::from_utf8(output.stdout.clone()).unwrap());
+                            String::from_utf8(output.stderr.clone()).unwrap()
                         }
-                        counter += 1;
                     },
-                    _ => {
-                        println!("err");
-                        counter += 1;
-                    }
+                    Err(e) => e.to_string()
+                };
+
+                if self.keep_order {
+                    debug!("order {}", order);
+                    messages.insert(order as usize, message);
+                }else{
+                    messages.insert(counter, message);
                 }
-                
+                counter += 1;
             }
 
             // display output message
