@@ -5,7 +5,7 @@ use tokio::process::Command;
 use std::thread;
 use std::process;
 
-/**
+/***
  * Representation of the command execution environment :
  * - `cmd : String` - linux command name
  * - `parameter: Vec<String>` - list of command parameters
