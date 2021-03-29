@@ -9,7 +9,7 @@ use pest::iterators::Pairs;
 pub struct ParallelParser;
 
 pub fn parse(raw_string: &str) -> Result<Pairs<Rule>, Error<Rule>> {   
-    let parse_result = ParallelParser::parse(Rule::main, &raw_string);
+    let parse_result = ParallelParser::parse(Rule::main, raw_string);
     let inputs = match parse_result {
         Ok(pairs) => pairs,
         Err(error) => {
@@ -18,34 +18,33 @@ pub fn parse(raw_string: &str) -> Result<Pairs<Rule>, Error<Rule>> {
         }
     };
     return Ok(inputs);
+}
 
-    // let inputs = inputs.next().unwrap(); // get and unwrap the `main` rule; never fails
-    // for pairs in inputs.into_inner() {
-    //     match pairs.as_rule() {
-    //         Rule::options => println!("option : {}", pairs.as_str()),
-    //         Rule::commands => {
-    //             println!("command : {}", pairs.as_str());
-    //             for arg in pairs.into_inner().skip(1) /*skip the first item*/ {
-    //                 print!("argument : {} (of type", arg.as_str());
-    //                 let rule = arg.into_inner().next().unwrap().as_rule();
-    //                 match rule {
-    //                     Rule::target => println!(" target)"),
-    //                     Rule::quoted_char => println!(" quoted char)"),
-    //                     Rule::string => println!(" string)"),
-    //                     _ => unreachable!(),
-    //                 }
-    //             }
-    //         }
-    //         Rule::separators => {
-    //             println!("separator : {}", pairs.as_str());
-    //             for input in pairs.into_inner().skip(1) {
-    //                 println!("input : {}", input.as_str());
-    //             }
-    //         }
-    //         // some rules are not reachable from main rule, 
-    //         // that is totaly normal according to the grammar.
-    //         _ => unreachable!(),
-    //     }
-    // }
-    // return Ok(inputs);
+#[test]
+#[should_panic]
+fn test_panic0() {
+    parse("paralll echo ::: 1 2 3").unwrap();
+    //          ^- error here
+}
+
+#[test]
+#[should_panic]
+fn test_panic1() {
+    parse("parallel ::: 1 2 3").unwrap();
+}
+
+#[test]
+#[should_panic]
+fn test_panic2() {
+    // asking for help make the parser yelling anyway because
+    // of the awaited command to be specified, and in fine, the
+    // behaviour remains the same : display usage.
+    parse("parallel --help").unwrap();
+}
+
+#[test]
+#[should_panic]
+fn test_panic3() {
+    //command missing in a complex string
+    parse("parallel --dry-run --jobs 5 ::: 1 2 3 ::: A B C DE").unwrap();
 }
