@@ -1,10 +1,11 @@
 use std::io;
 use tokio::io::Ready;
+use tokio::io::Interest;
 use tokio::net::TcpStream;
 
 use log::debug;
 
-pub trait ChannelListener {
+pub trait ChannelListener: std::marker::Send {
     /// Method invoked when a message has been fully read
     /// If this returns an option Some the Channel will change his
     /// interest to Write
@@ -29,6 +30,8 @@ pub struct Channel<'a> {
     /// Ready struct, used to know if we're looking to read or write
     ready: Ready,
 
+    interest : Interest,
+
     /// Socket linked to this channel
     socket: TcpStream,
 
@@ -48,6 +51,8 @@ impl<'a> Channel<'a> {
 
             ready: Ready::EMPTY,
 
+            interest : Interest::READABLE,
+
             socket: socket,
 
             listener: None,
@@ -57,8 +62,8 @@ impl<'a> Channel<'a> {
     }
 
     /// Modify the current interest of the Channel
-    pub fn set_interest(&mut self, interest: Ready) {
-        self.ready = interest;
+    pub fn set_interest(&mut self, interest: Interest) {
+        self.interest = interest;
     }
 
     /// Set the listener of this Channel
@@ -77,25 +82,31 @@ impl<'a> Channel<'a> {
     /// Clone the given buffer
     pub fn send(&mut self, buf: Vec<u8>) {
         self.write_buf = buf.clone();
+        debug!("Sending : {}", String::from_utf8(self.write_buf.clone()).unwrap());
     }
 
-    pub fn exchange_loop(&mut self) -> Result<(), String> {
+    pub async fn exchange_loop(&mut self) -> Result<(), String> {
         let mut size_response: u64 = 0;
         let mut size_request: u64 = 0;
 
         self.running = true;
 
-        if self.ready == Ready::EMPTY {
-            panic!("Interest hasn't been set");
-        }
+        let mut data = vec![0; 1024];
+        let mut size = vec![0; 8];
+
+        let mut size_array = [0;8];
+        let mut size_index = 0;
+
+        let mut size_sent = 0;
 
         while self.running {
+
+            self.ready = self.socket.ready(self.interest).await.unwrap();
+
             if self.ready.is_readable() {
                 // Vec size can be modified to read more bytes
                 // during each iteration
-                let mut data = vec![0; 1024];
-                let mut size = vec![0; 8];
-
+                
                 let read_result;
 
                 // If size_request is equal to 0 it means
@@ -110,22 +121,30 @@ impl<'a> Channel<'a> {
                     Ok(n) => {
                         // We're assuming that we always read the 8 bytes for the size
                         // in one try
-                        if size_request == 0 && n == 8 {
+                        if size_request == 0 {
                             // Retrieve the 8 bytes, and convert it to an u64
                             // using the native endianness
-                            let mut array = [0; 8];
-                            for i in 0..8 {
-                                array[i] = size[i];
+                            for i in size_index..n {
+                                size_array[i] = size[i-size_index];
                             }
-                            size_request = u64::from_ne_bytes(array);
+                            size_index += n;
+                            //size.clear();
+
+                            if size_index == 8 {
+                                size_request = u64::from_ne_bytes(size_array);
+                                size_array = [0;8];
+                                size_index = 0;
+                            }
+
                         } else if size_request > 0 {
                             // Retrieve each bytes and put it the reader buffer
                             for i in 0..n {
                                 self.read_buf.push(data[i]);
                             }
 
+                     
                             size_request = size_request - (n as u64);
-                            data.clear();
+                            //data.clear();
 
                             if size_request <= 0 {
                                 // Call the listener to tell him that we received the message
@@ -139,7 +158,7 @@ impl<'a> Channel<'a> {
                                     // The listener returned an Option Some containing
                                     // the next msg, we need to change the interest of our channel
                                     // to WRITABLE in order for him to send the next message
-                                    self.ready = Ready::WRITABLE;
+                                    self.set_interest(Interest::WRITABLE);
                                     self.send(next_msg);
                                 } else {
                                     // The listener returned an Option None, it means that
@@ -163,7 +182,7 @@ impl<'a> Channel<'a> {
                         }
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        size_request = 0;
+                       
                         continue;
                     }
                     Err(e) => {
@@ -175,18 +194,22 @@ impl<'a> Channel<'a> {
 
             // Write part
             if self.ready.is_writable() {
+                
                 // If size_response is equal to 0, it means
                 // that we haven't read the size yet
                 if size_response == 0 {
                     size_response = self.write_buf.len() as u64;
                     match self.socket.try_write(&mut size_response.to_ne_bytes()) {
                         Ok(n) => {
-                            if n != 8 {
-                                panic!("NYI when size isn't sent entirely");
+                            size_sent += n;
+                            
+                            if n == 0 {
+                                return Err(String::from("Channel has been closed"));
                             }
+
                         }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                            size_response = 0;
+                            
                             continue;
                         }
                         Err(_e) => {
@@ -197,6 +220,26 @@ impl<'a> Channel<'a> {
                 // If size_response isn't equal to 0, we can skip to
                 // reading data part
                 } else {
+
+                    if size_sent != 8 {
+                        let size_to_sent = &size_response.to_ne_bytes()[size_sent..];
+                        match self.socket.try_write(size_to_sent) {
+                            Ok(n) => {
+                                size_sent += n;
+    
+                                if n == 0 {
+                                    return Err(String::from("Channel has been closed"));
+                                }
+                            }
+                            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                                
+                                continue;
+                            }
+                            Err(_e) => {
+                                return Err(String::from("Unknown Error"));
+                            }
+                        }
+                    }
                     match self.socket.try_write(&mut self.write_buf) {
                         Ok(n) => {
                             size_response -= n as u64;
@@ -210,13 +253,15 @@ impl<'a> Channel<'a> {
                                 // channel to be prepared to read a reponse
                                 // If not we can close this channel
                                 if let Some(_) = self.listener.as_mut().unwrap().sent() {
-                                    self.ready = Ready::READABLE;
+                                    self.set_interest(Interest::READABLE);
+                                    size_sent = 0;
                                 } else {
                                     self.close();
                                 }
                             }
                         }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                
                             continue;
                         }
                         Err(_e) => {

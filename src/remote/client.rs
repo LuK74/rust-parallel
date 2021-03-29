@@ -1,4 +1,4 @@
-use tokio::io::Ready;
+use tokio::io::Interest;
 use tokio::net::TcpStream;
 
 use std::fs::File;
@@ -75,8 +75,8 @@ impl ParallelClient {
 
         // Preparation of the Channel
         channel.set_listener(self);
-        channel.set_interest(Ready::WRITABLE);
-        channel.exchange_loop().unwrap();
+        channel.set_interest(Interest::WRITABLE);
+        channel.exchange_loop().await.unwrap();
 
         Ok(self.request_response.clone())
     }

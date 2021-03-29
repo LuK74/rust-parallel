@@ -1,4 +1,4 @@
-use tokio::io::Ready;
+use tokio::io::Interest;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 
@@ -63,11 +63,16 @@ impl ParallelServer {
     // Each of this ParallelWorker will do his job in his own
     // thread
     pub async fn waiting_request(&mut self) {
+
         loop {
             let tmp_dir = self.tmp_dir.clone();
             if let Ok((s, _)) = self.listener.accept().await {
                 tokio::spawn(async move {
-                    ParallelWorker::process(s, tmp_dir).unwrap();
+                    if let Ok(_) = ParallelWorker::process(s, tmp_dir).await {
+
+                    } else {
+
+                    }
                 });
                 continue;
             } else {
@@ -142,9 +147,9 @@ impl ParallelWorker {
     // Given a TcpStream and the path to the temporary directory
     // This method will create and start a ParallelWorker
     // It will also retrieve the result and return it
-    pub fn process(socket: TcpStream, tmp_dir: String) -> Result<String, String> {
+    pub async fn process(socket: TcpStream, tmp_dir: String) -> Result<String, String> {
         let mut worker = ParallelWorker::new(tmp_dir);
-        let result_work = worker.start_worker(socket);
+        let result_work = worker.start_worker(socket).await;
 
         if let Ok(res) = result_work {
             return Ok(res);
@@ -156,16 +161,16 @@ impl ParallelWorker {
 
     // Method used to start a worker
     // It will create and set the Channel used for the exchange
-    pub fn start_worker(&mut self, socket: TcpStream) -> Result<String, String> {
+    pub async fn start_worker(&mut self, socket: TcpStream) -> Result<String, String> {
         // Channel creation
         let mut channel: Channel = Channel::new(socket);
 
         // Preparation of the channel
         channel.set_listener(self);
-        channel.set_interest(Ready::READABLE);
+        channel.set_interest(Interest::READABLE);
 
         // Start of the exchange loop
-        channel.exchange_loop().unwrap();
+        channel.exchange_loop().await.unwrap();
 
         Ok(self.request_result.clone())
     }
@@ -189,7 +194,7 @@ impl ChannelListener for ParallelWorker {
                     self.state = WorkerState::WaitingRequest;
                     return Some("Ready for request".bytes().collect());
                 } else {
-                    println!("Unexepected behaviour, shouldn't be in a IDLE state");
+                    debug!("Unexepected behaviour, shouldn't be in a IDLE state");
                     return None;
                 }
             }
@@ -239,7 +244,7 @@ impl ChannelListener for ParallelWorker {
                             .open(self.tmp_dir.clone() + &self.current_file + &extension[..]);
                     // If the error isn't an AlreadyExists error, we'll panic
                     } else {
-                        debug!("{:?}", e);
+                        println!("{:?}", e);
                         panic!(
                             "Unexpected behaviour, couldn't create the temporary file for {}",
                             self.current_file
@@ -280,9 +285,9 @@ impl ChannelListener for ParallelWorker {
                 // !!! insert here the method executing the request !!! //
 
                 // put the request result in this variable
-                println!("Server : request received : {}", self.request);
+                debug!("Server : request received : {}", self.request);
                 self.request_result = self.request.clone();
-                println!("Server : result of request : {}", self.request_result);
+                debug!("Server : result of request : {}", self.request_result);
 
                 self.state = WorkerState::SendingResult;
                 return Some(self.request_result.bytes().collect());
