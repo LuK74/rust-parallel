@@ -1,7 +1,5 @@
 use rust_parallel::parallel::Parallel;
 use std::env;
-use rust_parallel::core::jobmanager::JobManager;
-use rust_parallel::core::interpretor;
 
 fn main() {
     #[cfg(debug_assertions)]
