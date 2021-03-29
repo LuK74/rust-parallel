@@ -185,7 +185,11 @@ impl JobManager {
                         }
                     },
                     // the command is uncorrect
-                    Err(e) => e.to_string()
+                    Err(e) => {
+                        let mut msg = String::from(e.to_string());
+                        msg.push_str("\n");
+                        msg
+                    }
                 };
 
                 if self.keep_order {

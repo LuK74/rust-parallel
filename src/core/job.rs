@@ -33,7 +33,7 @@ impl fmt::Display for Job {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let _r = write!(
             f,
-            r"Job : {} {}",
+            r"{}{}",
             self.cmd,
             self.parameter
                 .iter()
