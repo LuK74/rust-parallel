@@ -40,7 +40,7 @@ pub struct JobManager {
  */
 impl fmt::Display for JobManager {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let _r = write!(f, "Runtime with {:?} threads", self.nb_thread);
+        let _r = write!(f, "JobManager with \n\t{:?} threads \n\tdry-run : {} \n\tkeep-order : {}", self.nb_thread, self.dry_run, self.keep_order);
         for i in 0..self.cmds.len() {
             let _r = write!(f, "\n\t{}", self.cmds[i]);
         }
