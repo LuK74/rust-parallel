@@ -31,6 +31,7 @@ impl Parallel {
             Ok(result) => result,
             Err(error) => {
                 eprintln!("Error : {}", error);
+                print_usage();
                 return;
             }, 
         };
@@ -40,7 +41,10 @@ impl Parallel {
             Err(error) => {
                 match error {
                     interpretor::InterpretError::Help => print_usage(),
-                    interpretor::InterpretError::NoData(string) => eprintln!("{}", string),
+                    interpretor::InterpretError::NoData(string) => {
+                        eprintln!("{}", string);
+                        print_usage();
+                    },
                 }
                 return;
             },
