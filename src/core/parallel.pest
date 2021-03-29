@@ -5,7 +5,7 @@
 WHITESPACE = _{ " " } // will be implicitly inserted at every sequence and 
                       // between every repetition (except in atomic rules)
 
-main = {^"parallel" ~ options* ~ commands ~ separators*}
+main = {options* ~ commands* ~ separators*}
 
 options = { 
   ^"--dry-run" 

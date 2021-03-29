@@ -16,10 +16,10 @@ fn print_usage() {
 impl Parallel {
     pub fn new(args: Vec<String>) -> Parallel {
         let job_manager: JobManager = JobManager::new();
-        let mut command = String::from("parallel");
+        let mut command = String::from("");
         for arg in args {
-            command.push(' ');
             command.push_str(&arg);
+            command.push(' ');
         }
 
         Parallel { job_manager, command }
