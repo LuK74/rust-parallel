@@ -10,6 +10,13 @@ use super::job::Job;
 use super::parser::Rule;
 use pest::iterators::Pairs;
 
+/// All interpretation errors that can be created by the complexity of
+/// parallel that the parser can not see. Returned by using the function
+/// interpret.
+pub enum InterpretError {
+    NoData(String),
+}
+
 /// Builds all the possible combinations according to sep_val values.
 /// 
 /// ## PARAMS
@@ -59,7 +66,7 @@ fn orderly_sorter(vector: & Vec<Vec<&str>>) -> Vec<usize> {
     orderly_indexes
 }
 
-pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO : return type*/ {
+pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Result<(), InterpretError> {
     let mut nb_thread: Option<usize> = None;
     let mut dry_run : bool = false;
     let mut keep_order : bool = false;
@@ -76,8 +83,7 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
                     "--dry-run" => dry_run = true,
                     // Never fails because the parse succeeded.
                     "--jobs" | "-j" => nb_thread = Some(opt_iter.next().unwrap().parse::<usize>().unwrap()),
-                    "--pipe" => /*TODO*/(),
-                    "--help" => /*TODO return*/(),
+                    "--pipe" => /*has no effect yet.*/(),
                     _ => unreachable!(),
                 }
             }
@@ -120,10 +126,11 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
         // Create all jobs here from the command's pattern
         create_all_jobs(job_man, &combinations, command_pattern);
     } else {
-        //TODO : warn user that there is no input (pipe or separator)
+        return Err(InterpretError::NoData(String::from("you forgot ::: or to pipe data into parallel")));
     }
 
     job_man.set_exec_env(nb_thread, dry_run, keep_order);
+    Ok(())
 }
 
 fn create_job(job_man : &mut JobManager, command : &str) {
@@ -223,15 +230,24 @@ mod tests {
         let mut parsing_result2 = super::super::parser::parse("parallel echo -i{2} -{2}{1} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
         let mut parsing_result3 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
         let mut parsing_result4 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l").unwrap();
-        let mut parsing_result5 = super::super::parser::parse("parallel --keep-order --dry-run echo -i {2}{} ok';'wc -l ::: 1 2 3").unwrap();
-        interpret(&mut jm, &mut parsing_result1);
-        interpret(&mut jm, &mut parsing_result2);
-        interpret(&mut jm, &mut parsing_result3);
-        interpret(&mut jm, &mut parsing_result4);
-        interpret(&mut jm, &mut parsing_result5);
+        // With parallel there are no issues specifying multiple times the same option
+        let mut parsing_result5 = super::super::parser::parse("parallel --keep-order --dry-run --jobs 5 --jobs 3 echo -i {2}{} ok';'wc -l ::: 1 2 3").unwrap();
+        // And so the interpretation must not panic !
+        let _ = interpret(&mut jm, &mut parsing_result1);
+        let _ = interpret(&mut jm, &mut parsing_result2);
+        let _ = interpret(&mut jm, &mut parsing_result3);
+        let _ = interpret(&mut jm, &mut parsing_result4);
+        let _ = interpret(&mut jm, &mut parsing_result5);
     }
 
     #[test]
     fn builder_test2() {
+        let mut jm = JobManager::new();
+        // "parallel echo :::" Must pass throught parsing but not interpretation
+        let mut parsing_result6 = super::super::parser::parse("parallel echo :::").unwrap();
+        match interpret(&mut jm, &mut parsing_result6) {
+            Err(InterpretError::NoData(_)) => (),
+            _ => panic!()
+        }
     }
 }
