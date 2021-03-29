@@ -171,17 +171,20 @@ impl JobManager {
             // allows to wait for the output of all commands and to store them 
             // either in the order of arrival or in the order of execution (if requested => keep order)
             let mut counter : usize = 0;
-            let mut messages = vec![Default::default(); nb_cmd];
+            let mut messages = vec![Default::default(); nb_cmd]; // create Vector with default value
             while counter < nb_cmd {
                 let (order, result) = rx.recv().await.unwrap();
                 let message: String = match result {
+                    // if the command is correct
                     Ok(output) => {
+                        // if the command was executed successfully
                         if output.status.success() {
                             String::from_utf8(output.stdout.clone()).unwrap()
                         }else{
                             String::from_utf8(output.stderr.clone()).unwrap()
                         }
                     },
+                    // the command is uncorrect
                     Err(e) => e.to_string()
                 };
 
