@@ -33,7 +33,7 @@ mod tests {
             String::from("World"),
         ];
 
-        let mut prg = Parallel::new(args);
+        let mut prg = Parallel::new(String::from("/bin/bash"), args);
 
         prg.start();
     }

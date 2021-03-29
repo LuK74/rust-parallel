@@ -223,7 +223,7 @@ mod tests {
     static NB_THREAD : Option<usize> = Some(5);
 
     fn init_jm (nb : Option<usize>, d_r : bool, k_o : bool) -> JobManager {
-        let mut jobmanager = JobManager::new();
+        let mut jobmanager = JobManager::new(String::from("/bin/bash"));
         jobmanager.set_exec_env(nb, d_r, k_o);
 
         jobmanager

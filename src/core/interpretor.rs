@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn builder_test1() {
-        let mut jm = JobManager::new();
+        let mut jm = JobManager::new(String::from("/bin/bash"));
         // All parses below should succeed !
         let mut parsing_result1 = super::super::parser::parse("echo ::: 1 2 3").unwrap();
         let mut parsing_result2 = super::super::parser::parse("echo -i{2} -{2}{1} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn builder_test2() {
-        let mut jm = JobManager::new();
+        let mut jm = JobManager::new(String::from("/bin/bash"));
         // "parallel echo :::" Must pass throught parsing but not interpretation
         let mut parsing_result6 = super::super::parser::parse("echo :::").unwrap();
         match interpret(&mut jm, &mut parsing_result6) {
@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn builder_test3() {
-        let mut jm = JobManager::new();
+        let mut jm = JobManager::new(String::from("/bin/bash"));
         // "parallel --help echo ::: 1 2 3" Must pass throught parsing but not interpretation
         let mut parsing_result6 = super::super::parser::parse("--help echo ::: 1 2 3").unwrap();
         match interpret(&mut jm, &mut parsing_result6) {
