@@ -4,15 +4,11 @@
 /////////////////////////////////////////////////////////////////////////////////////
 
 use super::jobmanager::JobManager;
+use super::job::Job;
 
 // To see the avaible Rules & Pairs from the grammar:
 use super::parser::Rule;
 use pest::iterators::Pairs;
-
-fn create_job(command : &str) {
-    println!("job created : '{}'", command);
-    //TODO : create the job.
-}
 
 /// Builds all the possible combinations according to sep_val values.
 /// 
@@ -67,6 +63,7 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
     let mut nb_thread: Option<usize> = None;
     let mut dry_run : bool = false;
     let mut keep_order : bool = false;
+
     let mut separators : Vec<Vec<&str>> = Vec::new();
     let mut command_pattern : String = String::from("");
 
@@ -107,6 +104,7 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
         }
     }
 
+    // TODO : add input in separators values.
 
     if separators.len() > 0 {
         // to properly imbricate the loops that will be used to create 
@@ -120,69 +118,80 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
         build_combinations(&mut combinations, &vec_ordered, 0, &separators, Vec::new());
 
         // Create all jobs here from the command's pattern
-        for combination in combinations {
-            // we un-quote special characters.
-            let mut command = command_pattern.replace("'", "");
-
-            // in parallel, having *no targets* or a *"{}"* target while having 
-            // one or multiple seprators has the same behaviour has "{1}" for 
-            // one separator, "{1} {2}" for two separators, "{1} {2} {3}" for
-            // three separators, etc.
-            let mut combo = String::from("");
-            for value in &combination {
-                combo.push_str(value);
-                if combination.last().unwrap() != value { combo.push(' '); }
-            }
-
-            // we check if actual targets exist
-            let mut target_exists = false;
-            let open_braces = command.find('{').unwrap_or(0);
-            let close_braces = command.find('}').unwrap_or(0);
-            if open_braces < close_braces {
-                let braces_content = command[open_braces+1..close_braces].parse::<usize>();
-                match braces_content {
-                    Ok(_)  => target_exists = true,
-                    _ => target_exists = false,
-                }
-            }
-
-            if !target_exists {
-                command.push(' ');
-                command.push_str(combo.as_str());
-            } else {
-                command = command.replace("{}", combo.as_str());
-                // If we encounter special targets like "{1}" we replace them with
-                // the right value of the combination.
-                while target_exists {
-                    let open_braces = command.find('{').unwrap_or(0);
-                    let close_braces = command.find('}').unwrap_or(0);
-                    if open_braces < close_braces {
-                        let braces_content = command[open_braces+1..close_braces].parse::<usize>();
-                        match braces_content {
-                            Ok(value)  => {
-                                if value <= combination.len() {
-                                    command.replace_range(open_braces..=close_braces, combination[value - 1]);
-                                } else {
-                                    // the value is above the separator's index
-                                    // ex : specifying target {3} while only 
-                                    //      two dimensions were specified.
-                                    target_exists = false;
-                                }
-                            }
-                            // an error occured while parsing the usize
-                            _ => target_exists = false,
-                        }
-                    } else {
-                        // no valid braces found !
-                        target_exists = false;
-                    }
-                }
-            }
-            create_job(&command);
-        }
+        create_all_jobs(job_man, &combinations, command_pattern);
+    } else {
+        //TODO : warn user that there is no input (pipe or separator)
     }
 
     job_man.set_exec_env(nb_thread, dry_run, keep_order);
+}
+
+fn create_job(job_man : &JobManager, command : &str) {
+    let job = Job::new(command.split_whitespace().map(String::from).collect());
+    job_man.add_job(job);
+}
+
+fn create_all_jobs(job_man : &JobManager, combinations : &Vec<Vec<&str>>, command_pattern : String) {
+    for combination in combinations {
+        // we un-quote special characters.
+        let mut command = command_pattern.replace("'", "");
+
+        // in parallel, having no targets or a "{}" target while having 
+        // one or multiple seprators has the same behaviour has "{1}" for 
+        // one separator, "{1} {2}" for two separators, "{1} {2} {3}" for
+        // three separators, etc.
+        let mut combo = String::from("");
+        for value in combination {
+            combo.push_str(value);
+            if combination.last().unwrap() != value { combo.push(' '); }
+        }
+
+        // we check if actual targets exist
+        let mut target_exists = false;
+        let open_braces = command.find('{').unwrap_or(0);
+        let close_braces = command.find('}').unwrap_or(0);
+        if open_braces < close_braces {
+            let braces_content = command[open_braces+1..close_braces].parse::<usize>();
+            match braces_content {
+                Ok(_)  => target_exists = true,
+                _ => target_exists = false,
+            }
+        }
+
+        if !target_exists {
+            command.push(' ');
+            command.push_str(combo.as_str());
+        } else {
+            command = command.replace("{}", combo.as_str());
+            // If we encounter special targets like "{1}" we replace them with
+            // the right value of the combination.
+            while target_exists {
+                let open_braces = command.find('{').unwrap_or(0);
+                let close_braces = command.find('}').unwrap_or(0);
+                if open_braces < close_braces {
+                    let braces_content = command[open_braces+1..close_braces].parse::<usize>();
+                    match braces_content {
+                        Ok(value)  => {
+                            if value <= combination.len() {
+                                command.replace_range(open_braces..=close_braces, combination[value - 1]);
+                            } else {
+                                // The value is above the separator's index
+                                // ex : specifying target {3} while only two dimensions were specified.
+                                // So we ignore the target and erase it as parallel would do the same.
+                                command.replace_range(open_braces..=close_braces, "");
+                            }
+                        }
+                        // an error occured while parsing the usize
+                        _ => target_exists = false,
+                    }
+                } else {
+                    // no valid braces found !
+                    target_exists = false;
+                }
+            }
+        }
+        create_job(job_man, &command);
+    }
 }
 
 #[cfg(test)]
@@ -209,8 +218,9 @@ mod tests {
     #[test]
     fn builder_test1() {
         let mut jm = JobManager::new();
+        // All parses below should succeed !
         let mut parsing_result1 = super::super::parser::parse("parallel echo ::: 1 2 3").unwrap();
-        let mut parsing_result2 = super::super::parser::parse("parallel echo -i {2}{1} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
+        let mut parsing_result2 = super::super::parser::parse("parallel echo -i{2} -{2}{1} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
         let mut parsing_result3 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
         let mut parsing_result4 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l").unwrap();
         let mut parsing_result5 = super::super::parser::parse("parallel --keep-order --dry-run echo -i {2}{} ok';'wc -l ::: 1 2 3").unwrap();
