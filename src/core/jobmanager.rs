@@ -29,6 +29,7 @@ use futures::future;
  * ```
  */
 pub struct JobManager {
+    pub shell: String, //the shell used to launch jobs
     cmds: Vec<Job>,
     nb_thread: Option<usize>,
     dry_run : bool,
@@ -57,8 +58,9 @@ impl JobManager {
      * - `dry_run` - false
      * - `keep_order` - false
      */
-    pub fn new() -> JobManager {
+    pub fn new(shell: String) -> JobManager {
         JobManager {
+            shell: shell,
             cmds: vec![],
             nb_thread: None,
             dry_run : false,

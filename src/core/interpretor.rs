@@ -136,8 +136,10 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
 }
 
 fn create_job(job_man : &mut JobManager, command : &str) {
-    let job = Job::new(command.split_whitespace().map(String::from).collect());
-    job_man.add_job(job);
+    let mut new_shell_job = vec![String::from(job_man.shell.as_str())];
+    new_shell_job.push(String::from("-c"));
+    new_shell_job.push(String::from(command));
+    job_man.add_job(Job::new(new_shell_job));
 }
 
 fn create_all_jobs(job_man : &mut JobManager, combinations : &Vec<Vec<&str>>, command_pattern : String) {

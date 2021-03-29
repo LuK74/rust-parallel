@@ -14,8 +14,8 @@ fn print_usage() {
 }
 
 impl Parallel {
-    pub fn new(args: Vec<String>) -> Parallel {
-        let job_manager: JobManager = JobManager::new();
+    pub fn new(shell: String, args: Vec<String>) -> Parallel {
+        let job_manager: JobManager = JobManager::new(shell);
         let mut command = String::from("");
         for arg in args {
             command.push_str(&arg);
