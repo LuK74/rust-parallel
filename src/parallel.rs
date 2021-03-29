@@ -1,3 +1,5 @@
+// #![feature(external_doc)] // for #[doc(include="../README.md")] line 59
+
 use crate::core::jobmanager::JobManager;
 use crate::core::interpretor;
 use crate::core::parser;
@@ -54,6 +56,7 @@ impl Parallel {
     /**
      * Display help.
      */
+    // #[doc(include="../README.md")] // currently not available
     fn print_usage() {
         println!("RUST PARALLEL");
         println!("rust_parallel [options] [command [arguments | {spe} | {spe}]] (:::+ arguments)", spe="{}");
