@@ -1,37 +1,17 @@
+/////////////////////////////////////////////////////////////////////////////////////
+/// Disclaimer : this file works very closely with the grammar of rust-parallel,  ///
+/// if the grammar changes the code below should be maintained accordingly.       ///
+/////////////////////////////////////////////////////////////////////////////////////
+
 use super::jobmanager::JobManager;
 
 // To see the avaible Rules & Pairs from the grammar:
 use super::parser::Rule;
 use pest::iterators::Pairs;
 
-// fn orderer (vector : Vec<Vec<&str>>) -> Vec<usize> {
-//     let mut vec_new = vector.clone();
-//     let mut vec_ordered = Vec::new();
-//     let mut max = 0;
-//     let mut index = 0; // index memorized inside the returned vector
-//     let mut j = 0;
-//     while vec_ordered.len() != vector.len() {
-//         for elem in &vec_new {
-//             if elem.len() > max {
-//                 max = elem.len();
-//                 index = j;
-//             }
-//             j = j + 1;
-//         }
-//         // j and max are reinitialized
-//         j = 0;
-//         max = 0;
-//         // we add the index of the vector with the biggest size
-//         vec_ordered.push(index);
-//         // we substitute the vector with the biggest size with an empty vector
-//         vec_new.remove(index);
-//         vec_new.insert(index, Vec::new());
-//     }
-//     return vec_ordered;
-// }
-
 fn create_job(command : &str) {
     println!("job created : '{}'", command);
+    //TODO : create the job.
 }
 
 /// Builds all the possible combinations according to sep_val values.
@@ -97,7 +77,8 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
                 match opt_iter.next().unwrap() {
                     "--keep-order" => keep_order = true,
                     "--dry-run" => dry_run = true,
-                    "--jobs" | "-j" => nb_thread = Some(opt_iter.next().unwrap().parse::<usize>().unwrap()), // never fails
+                    // Never fails because the parse succeeded.
+                    "--jobs" | "-j" => nb_thread = Some(opt_iter.next().unwrap().parse::<usize>().unwrap()),
                     "--pipe" => /*TODO*/(),
                     "--help" => /*TODO return*/(),
                     _ => unreachable!(),
@@ -106,7 +87,7 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
             Rule::commands => command_pattern = String::from(pair.into_inner().as_str()),
             Rule::separators => {
                 let mut separator = Vec::new();
-                for sep_values in pair.into_inner().skip(1) /*we skip "separator" rule*/ {
+                for sep_values in pair.into_inner().skip(1) /*we skip the "separator" rule*/ {
                     // here we are on "input" rule
                     match sep_values.as_rule() {
                         Rule::string => separator.push(sep_values.as_str()),
@@ -129,31 +110,61 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) /*TODO :
     // TODO : explain why we need this
     let vec_ordered = orderly_sorter(&separators);
 
-    // build all possible combinations
+    // build all possible combinations from separators values
     build_combinations(&mut combinations, &vec_ordered, 0, &separators, Vec::new());
 
     // Create all jobs here from the command's pattern
     for combination in combinations {
-        // Here we don't 
+        // we un-quote special characters.
         let mut command = command_pattern.replace("'", "");
+
+        // in parallel, having *no targets* or a *"{}"* target while having 
+        // one or multiple seprators has the same behaviour has "{1}" for 
+        // one separator, "{1} {2}" for two separators, "{1} {2} {3}" for
+        // three separators, etc.
         let mut combo = String::from("");
         for value in &combination {
             combo.push_str(value);
-            if combination.last().unwrap() != value { combo.push_str(" "); }
+            if combination.last().unwrap() != value { combo.push(' '); }
         }
-        command = command.replace("{}", combo.as_str());
-        let mut braces_exists = true;
-        while braces_exists {
-            let open_braces = command.find('{').unwrap_or(command.len());
-            let close_braces = command.find('}').unwrap_or(command.len());
-            let spaces_between_braces = close_braces - open_braces;
-            if spaces_between_braces >= 2 {
-                let braces_content = command[open_braces+1..close_braces].parse::<usize>().unwrap(); //never fails
-                if braces_content <= combination.len() {
-                    command.replace_range(open_braces..=close_braces, combination[braces_content - 1]);
+
+        // we check if actual targets exist
+        let mut target_exists = false;
+        let open_braces = command.find('{').unwrap_or(0);
+        let close_braces = command.find('}').unwrap_or(0);
+        if open_braces < close_braces {
+            let braces_content = command[open_braces+1..close_braces].parse::<usize>();
+            match braces_content {
+                Ok(_)  => target_exists = true,
+                _ => target_exists = false,
+            }
+        }
+
+        if !target_exists {
+            command.push(' ');
+            command.push_str(combo.as_str());
+        } else {
+            command = command.replace("{}", combo.as_str());
+            // If we encounter special targets like "{1}" we replace them with
+            // the right value of the combination.
+            while target_exists {
+                let open_braces = command.find('{').unwrap_or(0);
+                let close_braces = command.find('}').unwrap_or(0);
+                if open_braces < close_braces {
+                    let braces_content = command[open_braces+1..close_braces].parse::<usize>();
+                    match braces_content {
+                        Ok(value)  => {
+                            if value <= combination.len() {
+                                command.replace_range(open_braces..=close_braces, combination[value - 1]);
+                            } else {
+                                target_exists = false;
+                            }
+                        }
+                        _ => target_exists = false,
+                    }
+                } else {
+                    target_exists = false;
                 }
-            } else {
-                braces_exists = false;
             }
         }
         create_job(&command);
@@ -186,8 +197,16 @@ mod tests {
     #[test]
     fn builder_test1() {
         let mut jm = JobManager::new();
-        let mut parsing_result = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
-        interpret(&mut jm, &mut parsing_result);
+        let mut parsing_result1 = super::super::parser::parse("parallel echo ::: 1 2 3").unwrap();
+        let mut parsing_result2 = super::super::parser::parse("parallel echo -i {2}{1} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
+        let mut parsing_result3 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
+        let mut parsing_result4 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l").unwrap();
+        let mut parsing_result5 = super::super::parser::parse("parallel --keep-order --dry-run echo -i {2}{} ok';'wc -l ::: 1 2 3").unwrap();
+        interpret(&mut jm, &mut parsing_result1);
+        interpret(&mut jm, &mut parsing_result2);
+        interpret(&mut jm, &mut parsing_result3);
+        interpret(&mut jm, &mut parsing_result4);
+        interpret(&mut jm, &mut parsing_result5);
     }
 
     #[test]
