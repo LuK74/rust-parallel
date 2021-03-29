@@ -21,6 +21,7 @@ mod tests {
 
         let args: Vec<String> = vec![
             String::from("echo"),
+            String::from(":::"),
             String::from("Hello"),
             String::from("World"),
         ];

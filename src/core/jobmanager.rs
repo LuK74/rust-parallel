@@ -8,7 +8,7 @@ use std::process;
 use tokio::sync::mpsc;
 use futures::future;
 
-/***
+/**
  * Representation of the command execution environment :
  * - `cmds : Vec<Job>` - the list of commands to be executed 
  * - `nb_thread : Option<usize>` - the number of threads to be used in the execution environment
