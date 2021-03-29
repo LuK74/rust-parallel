@@ -67,7 +67,7 @@ impl Job {
      * # Return
      * either the standard output if the execution was successful or an error.
      */
-    pub async fn exec(&mut self) -> Result<process::Output, Box<dyn std::error::Error>> {
+    pub async fn exec(&mut self) -> Result<process::Output, std::io::Error> {
         debug!("{} {:?}",process::id(), thread::current().id());
 
         // Create a new tokio command with the linux command name
@@ -85,10 +85,13 @@ impl Job {
         debug!("<{}> spawn", self);
 
         // Wait for the result of the command execution
-        let output : process::Output = future.await?;
+        let future_result = future.await;
+        match future_result {
+            Err(e) => return Err(e),
+            Ok(o) => return Ok(o),
+        }
 
         // if there was no error during execution then the output is returned
-        Ok(output)
     }
 }
 

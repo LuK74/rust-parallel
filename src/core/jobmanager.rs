@@ -1,3 +1,4 @@
+use std::error::Error;
 use super::job::Job;
 use log::debug;
 use std::fmt;
@@ -149,7 +150,7 @@ impl JobManager {
 
             // mpsc = multi producer single consumer
             // allow to the main thread to retrieve the output of child threads
-            let (tx, mut rx) = mpsc::channel::<(i32,process::Output)>(1);
+            let (tx, mut rx) = mpsc::channel::<(i32,Result<process::Output, std::io::Error>)>(1);
 
             // allows to keep the execution order
             let mut order : i32 = 0;
@@ -161,7 +162,7 @@ impl JobManager {
 
                 // gives a new task to the runtime which executes the command and get output asynchronoulsy
                 let task = tokio::spawn(async move {
-                    let output = cmd.exec().await.unwrap();
+                    let output = cmd.exec().await;
                     tx_task.send((order,output)).await.unwrap();
                 });
                 tasks.push(task);
@@ -174,13 +175,23 @@ impl JobManager {
             let mut messages = vec![Default::default(); nb_cmd];
             while counter < nb_cmd {
                 let (order, message) = rx.recv().await.unwrap();
-                if self.keep_order {
-                    debug!("order {}", order);
-                    messages.insert(order as usize, String::from_utf8(message.stdout.clone()).unwrap());
-                }else{
-                    messages.insert(counter, String::from_utf8(message.stdout.clone()).unwrap());
+                match message {
+                    Ok(output) => {
+                        println!("ok");
+                        if self.keep_order {
+                            debug!("order {}", order);
+                            messages.insert(order as usize, String::from_utf8(output.stdout.clone()).unwrap());
+                        }else{
+                            messages.insert(counter, String::from_utf8(output.stdout.clone()).unwrap());
+                        }
+                        counter += 1;
+                    },
+                    _ => {
+                        println!("err");
+                        counter += 1;
+                    }
                 }
-                counter += 1;
+                
             }
 
             // display output message
