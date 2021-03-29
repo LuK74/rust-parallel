@@ -5,23 +5,39 @@ use tokio::net::TcpStream;
 
 use log::debug;
 
+/**
+ * Entity listening to Channel events
+ * In our application this will be ParralelClient and ParralelServer
+ */
 pub trait ChannelListener: std::marker::Send {
-    /// Method invoked when a message has been fully read
-    /// If this returns an option Some the Channel will change his
-    /// interest to Write
+    /** Method invoked when a message has been fully read
+    * If this returns an option Some the Channel will change his
+    * interest to Write
+    */
     fn received(&mut self, buffer: Vec<u8>) -> Option<Vec<u8>>;
 
-    /// Method invoked when a message has been fully sent
-    /// If this returns an option Some the Channel will change his
-    /// interest to Read
+    /** Method invoked when a message has been fully sent
+    * If this returns an option Some the Channel will change his
+    * interest to Read
+    */
     fn sent(&mut self) -> Option<()>;
 }
 
 /**
- * Designed to be used with 0-knowledge of what the application does
- * Will only send and receive data, and call the associate listener
- * when those actions complete
- **/
+ * Entity designed to allow exchange between two distant host
+ * - `read_buf : Vec<u8>` - Buffer use to read data
+ * - `write_buf : Vec<u8>` - Buffer use to write data
+ * - `ready : Ready` - Ready struct, use to know if the Channel is in
+ * a Reading or Writting state
+ * - `interest : Interest` - Interest struct, use to initiate the ready
+ * variable
+ * - `socket : TcpStream` - Socket use by this side of the Channel to
+ * communication with the other side
+ * - `listener : Option<&'a mut dyn ChannelListener>` - Option struct 
+ * which can contain a reference to the ChannelListener
+ * - `running : bool` - Boolean allowing to know if the Channel is running
+ * or not
+ */
 pub struct Channel<'a> {
     /// Buffer used by the Channel to read and write
     read_buf: Vec<u8>,
@@ -43,7 +59,12 @@ pub struct Channel<'a> {
 }
 
 impl<'a> Channel<'a> {
-    /// Default Channel Constructor
+    /**
+    * Return a new Channel set with the given socket
+    * # Attributs
+    * - `socket : TcpStream` - Socket created by the Client or the
+    * Server and then given to the Channel
+    */
     pub fn new(socket: TcpStream) -> Self {
         Channel {
             read_buf: Vec::new(),
