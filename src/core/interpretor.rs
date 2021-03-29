@@ -226,12 +226,12 @@ mod tests {
     fn builder_test1() {
         let mut jm = JobManager::new();
         // All parses below should succeed !
-        let mut parsing_result1 = super::super::parser::parse("parallel echo ::: 1 2 3").unwrap();
-        let mut parsing_result2 = super::super::parser::parse("parallel echo -i{2} -{2}{1} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
-        let mut parsing_result3 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
-        let mut parsing_result4 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l").unwrap();
+        let mut parsing_result1 = super::super::parser::parse("echo ::: 1 2 3").unwrap();
+        let mut parsing_result2 = super::super::parser::parse("echo -i{2} -{2}{1} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
+        let mut parsing_result3 = super::super::parser::parse("--jobs 5 --dry-run echo -i {1}{} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
+        let mut parsing_result4 = super::super::parser::parse("--jobs 5 --dry-run echo -i {1}{} ok';'wc -l").unwrap();
         // With parallel there are no issues specifying multiple times the same option
-        let mut parsing_result5 = super::super::parser::parse("parallel --keep-order --dry-run --jobs 5 --jobs 3 echo -i {2}{} ok';'wc -l ::: 1 2 3").unwrap();
+        let mut parsing_result5 = super::super::parser::parse("--keep-order --dry-run --jobs 5 --jobs 3 echo -i {2}{} ok';'wc -l ::: 1 2 3").unwrap();
         // And so the interpretation must not panic !
         let _ = interpret(&mut jm, &mut parsing_result1);
         let _ = interpret(&mut jm, &mut parsing_result2);
@@ -244,7 +244,7 @@ mod tests {
     fn builder_test2() {
         let mut jm = JobManager::new();
         // "parallel echo :::" Must pass throught parsing but not interpretation
-        let mut parsing_result6 = super::super::parser::parse("parallel echo :::").unwrap();
+        let mut parsing_result6 = super::super::parser::parse("echo :::").unwrap();
         match interpret(&mut jm, &mut parsing_result6) {
             Err(InterpretError::NoData(_)) => (),
             _ => panic!()
@@ -255,7 +255,7 @@ mod tests {
     fn builder_test3() {
         let mut jm = JobManager::new();
         // "parallel --help echo ::: 1 2 3" Must pass throught parsing but not interpretation
-        let mut parsing_result6 = super::super::parser::parse("parallel --help echo ::: 1 2 3").unwrap();
+        let mut parsing_result6 = super::super::parser::parse("--help echo ::: 1 2 3").unwrap();
         match interpret(&mut jm, &mut parsing_result6) {
             Err(InterpretError::Help) => (),
             _ => panic!()
