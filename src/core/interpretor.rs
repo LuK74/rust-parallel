@@ -112,7 +112,7 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
         }
     }
 
-    // TODO : add input in separators values.
+    // TODO : add pipe input in separators values.
 
     if separators.len() > 0 {
         // to properly imbricate the loops that will be used to create 
@@ -152,8 +152,9 @@ fn create_all_jobs(job_man : &mut JobManager, combinations : &Vec<Vec<&str>>, co
         let mut combo = String::from("");
         for value in combination {
             combo.push_str(value);
-            if combination.last().unwrap() != value { combo.push(' '); }
+            combo.push(' ');
         }
+        combo = combo.trim_end().to_string();
 
         // we check if actual targets exist
         let mut target_exists = false;
