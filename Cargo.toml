@@ -25,5 +25,8 @@ tokio = { version = "1.2.0", features = [
     "process",
     "net",
 ] }
+futures = "0.3.13"
+pest = "2.0"
+pest_derive = "2.0"
 log = "0.4"
 env_logger = "*"
