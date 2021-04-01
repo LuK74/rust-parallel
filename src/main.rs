@@ -10,14 +10,6 @@ async fn main() {
 
     let args: Vec<String> = env::args().collect();
 
-    if args[1].eq("-c") {
-        println!("Remote execution on Client Side");
-        parallel::remote_exec_test(true, args[2..].to_vec()).await;
-    } else if args[1].eq("-s") {
-        println!("Remote execution on Server Side");
-        parallel::remote_exec_test(false, args[2..].to_vec()).await;
-    }
-
     /*let mut prg = Parallel::new();
     prg.new_cmd(args[1..args.len()].to_vec());
     prg.start();*/

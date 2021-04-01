@@ -2,8 +2,6 @@ use tokio::io::Interest;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 
-use std::error::Error;
-
 use std::fs::OpenOptions;
 use std::fs::{self, DirBuilder};
 use std::io::Write;
@@ -12,6 +10,12 @@ use log::debug;
 
 use crate::remote::channel::*;
 
+/**
+ * Server side of a Parallel Client-Server exchange
+ * - `listener : TcpListener` - Passive Socket of the Server side
+ * - `tmp_dir : String` - Path of the temporary directory used
+ * during the exchange files phase (if needed)
+ */
 pub struct ParallelServer {
     // Passive socket listening for Client request
     listener: TcpListener,
@@ -21,9 +25,18 @@ pub struct ParallelServer {
     tmp_dir: String,
 }
 
+/**
+ * ParallelServer functions implementation
+ */
 impl ParallelServer {
-    // ParralelServer constructor
-    // Will launch the passive socket and create the temporary directory
+    /**
+     * ParralelServer constructor
+     * Will launch the passive socket and create the temporary directory
+     * # Arguments
+     * - `server_adresse : String` - Server address of the server we want
+     * to create, need to follow this format : [serverAddress:serverPort]
+     * Example : 127.0.0.1:8080
+     */
     pub async fn new(server_address: String) -> Self {
         // Creation of the passive Socket
         let res_bind = TcpListener::bind(server_address.clone()).await;
@@ -57,21 +70,19 @@ impl ParallelServer {
         ParallelServer { listener, tmp_dir }
     }
 
-    // Listening loop
-    // Will listening to every client request and create a
-    // ParallelWorker for each one
-    // Each of this ParallelWorker will do his job in his own
-    // thread
+    /** Listening loop
+     * Will listening to every client request and create a
+     * ParallelWorker for each one
+     * Each of this ParallelWorker will do his job in his own
+     * thread
+     */
     pub async fn waiting_request(&mut self) {
-
         loop {
             let tmp_dir = self.tmp_dir.clone();
             if let Ok((s, _)) = self.listener.accept().await {
                 tokio::spawn(async move {
                     if let Ok(_) = ParallelWorker::process(s, tmp_dir).await {
-
                     } else {
-
                     }
                 });
                 continue;
@@ -89,19 +100,12 @@ impl ParallelServer {
     }
 }
 
-// Basic exchange Test
-pub async fn test_exchange() -> Result<(), Box<dyn Error>> {
-    let mut server: ParallelServer = ParallelServer::new(String::from("127.0.0.1:4000")).await;
-    debug!("Server opened on port 4000");
-
-    server.waiting_request().await;
-    Ok(())
-}
-
-// Enum used to know the current state of a Worker
-// Due to the fact that a Worker will need to retrieve several
-// types of informations and not necessarily in the same way each time,
-// the use of a state is well suited
+/**
+* Enum used to know the current state of a Worker
+* Due to the fact that a Worker will need to retrieve several
+* types of informations and not necessarily in the same way each time,
+* the use of a state is well suited
+*/
 pub enum WorkerState {
     Idle,
     WaitingFileName,
@@ -110,6 +114,19 @@ pub enum WorkerState {
     SendingResult,
 }
 
+/**
+ * Client side of a Parallel Client-Server exchange
+ * - `request : String` - Request that we want to execute
+ * - `request_result : String` - Use to store the request's result
+ * - `tmp_dir : String` - Path of the temporary directory used
+ * during the exchange files phase (if needed)
+ * - `files : Vec<(String, String)>` - Name of the files sent by the Client
+ * and their actual path
+ * Example : File toto.txt sent by the Client : (toto.txt, "/tmp/toto.txt")
+ * if the tmp_dir variable is set to "/tmp/"
+ * - `state : WorkerState` - Current state of the Worker
+ * - `current_file : String` - Field used for the file exchange phase
+ */
 pub struct ParallelWorker {
     // Result of the request execution
     request_result: String,
@@ -132,7 +149,12 @@ pub struct ParallelWorker {
 }
 
 impl ParallelWorker {
-    // ParallelWorker constructor
+    /**
+     * Default constructor for a Parallel Worker
+     * # Arguments
+     * - `tmp_dir : String` - Path of the temporary directory used
+     * during the exchange files phase (if needed)
+     */
     pub fn new(tmp_dir: String) -> Self {
         ParallelWorker {
             request_result: String::new(),
@@ -144,9 +166,16 @@ impl ParallelWorker {
         }
     }
 
-    // Given a TcpStream and the path to the temporary directory
-    // This method will create and start a ParallelWorker
-    // It will also retrieve the result and return it
+    /**
+     * Given a TcpStream and the path to the temporary directory
+     * This method will create and start a ParallelWorker
+     * It will also retrieve the result and return it
+     * # Arguments
+     * - `socket : TcpStream` : Socket created by the Server passive
+     * socket
+     * - `tmp_dir : String` - Path of the temporary directory used
+     * during the exchange files phase (if needed)
+     */
     pub async fn process(socket: TcpStream, tmp_dir: String) -> Result<String, String> {
         let mut worker = ParallelWorker::new(tmp_dir);
         let result_work = worker.start_worker(socket).await;
@@ -159,8 +188,13 @@ impl ParallelWorker {
         }
     }
 
-    // Method used to start a worker
-    // It will create and set the Channel used for the exchange
+    /**
+     * Method used to start a worker
+     * It will create and set the Channel used for the exchange
+     * # Arguments
+     * - `tmp_dir : String` - Path of the temporary directory used
+     * during the exchange files phase (if needed)
+     */
     pub async fn start_worker(&mut self, socket: TcpStream) -> Result<String, String> {
         // Channel creation
         let mut channel: Channel = Channel::new(socket);
@@ -177,6 +211,11 @@ impl ParallelWorker {
 }
 
 impl ChannelListener for ParallelWorker {
+    /**
+     * Method invoked when a message has been fully read
+     * If this returns an option Some the Channel will change his
+     * interest to Write
+     */
     fn received(&mut self, buffer: Vec<u8>) -> Option<Vec<u8>> {
         let response = String::from_utf8(buffer).unwrap();
         debug!("-- Server received : {}", response);
@@ -296,7 +335,10 @@ impl ChannelListener for ParallelWorker {
         }
     }
 
-    // Called when a message has been sent
+    /** Method invoked when a message has been fully sent
+     * If this returns an option Some the Channel will change his
+     * interest to Read
+     */
     fn sent(&mut self) -> Option<()> {
         match &self.state {
             // If we were in the SendingResult it means that

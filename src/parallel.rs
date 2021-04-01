@@ -24,11 +24,3 @@ impl Parallel {
         self.job_manager.exec_all();
     }
 }
-
-pub async fn remote_exec_test(client_side: bool, args: Vec<String>) {
-    if client_side {
-        client::test_exchange(args).await;
-    } else {
-        server::test_exchange().await.unwrap();
-    }
-}

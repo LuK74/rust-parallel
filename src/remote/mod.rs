@@ -4,13 +4,13 @@ pub mod server;
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
     use crate::remote::client::*;
     use crate::remote::server::*;
     use std::fs;
+    use std::fs::File;
     use std::fs::OpenOptions;
-    use std::io::Write;
     use std::io::Read;
+    use std::io::Write;
     use std::sync::Arc;
     use tokio::runtime::Runtime;
     use tokio::sync::Semaphore;
@@ -41,9 +41,8 @@ mod tests {
 
             mutex_main.acquire().await.unwrap();
 
-        
             let mut client: ParallelClient =
-            ParallelClient::new(String::from("127.0.0.1:8888"), "Hello World!".to_string());
+                ParallelClient::new(String::from("127.0.0.1:8888"), "Hello World!".to_string());
             let res = client.start_client().await;
 
             if let Ok(s) = res {
@@ -53,9 +52,8 @@ mod tests {
                 panic!("Shouldn't caught an error");
             }
         });
-    
-        fs::remove_dir_all("tmp").unwrap();
 
+        fs::remove_dir_all("tmp").unwrap();
     }
 
     // Test a basic "Hello World !" exchange
@@ -90,7 +88,10 @@ mod tests {
         }
 
         // Second file
-        let result = OpenOptions::new().write(true).create_new(true).open("toto2");
+        let result = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open("toto2");
 
         if let Err(e) = result {
             if e.kind() != std::io::ErrorKind::AlreadyExists {
@@ -116,12 +117,10 @@ mod tests {
 
             mutex_main.acquire().await.unwrap();
 
-            
-                let mut client: ParallelClient =
-                    ParallelClient::new(String::from("127.0.0.1:8889"), "Hello World!".to_string());
-                client.add_files(vec!["toto".to_string(), "toto2".to_string()]);
-                let res = client.start_client().await;
-
+            let mut client: ParallelClient =
+                ParallelClient::new(String::from("127.0.0.1:8889"), "Hello World!".to_string());
+            client.add_files(vec!["toto".to_string(), "toto2".to_string()]);
+            let res = client.start_client().await;
 
             if let Ok(s) = res {
                 assert_eq!(s, "Hello World!");
@@ -137,11 +136,9 @@ mod tests {
             }
         });
 
-            
         fs::remove_dir_all("tmp").unwrap();
         fs::remove_file("toto").unwrap();
         fs::remove_file("toto2").unwrap();
-
     }
 
     // Test a basic "Hello World !" exchange
@@ -179,7 +176,6 @@ mod tests {
             let mutex_server = Arc::new(Semaphore::new(0));
             let mutex_main = Arc::clone(&mutex_server);
 
-
             println!("Lauching server thread");
             tokio::spawn(async move {
                 let mut server: ParallelServer =
@@ -190,15 +186,15 @@ mod tests {
             });
 
             mutex_main.acquire().await.unwrap();
-            
+
             println!("Lauching client thread");
-           
-                let mut client: ParallelClient =
-                    ParallelClient::new(String::from("127.0.0.1:8890"), "Hello World!".to_string());
-                client.add_files(vec!["titi".to_string(), "titi".to_string()]);
-                println!("Client going to start");
-                let res = client.start_client().await;
-                println!("Client finish");
+
+            let mut client: ParallelClient =
+                ParallelClient::new(String::from("127.0.0.1:8890"), "Hello World!".to_string());
+            client.add_files(vec!["titi".to_string(), "titi".to_string()]);
+            println!("Client going to start");
+            let res = client.start_client().await;
+            println!("Client finish");
 
             if let Ok(s) = res {
                 assert_eq!(s, "Hello World!");
@@ -214,7 +210,6 @@ mod tests {
             }
         });
 
-                    
         fs::remove_dir_all("tmp").unwrap();
         fs::remove_file("titi").unwrap();
     }
@@ -242,7 +237,7 @@ mod tests {
             }
         } else {
             let mut file = result.unwrap();
-            let buf: &[u8] = &[1;1000000];
+            let buf: &[u8] = &[1; 1000000];
             file.write_all(buf).unwrap();
             file.sync_data().unwrap();
         }
@@ -250,7 +245,6 @@ mod tests {
         rt.block_on(async {
             let mutex_server = Arc::new(Semaphore::new(0));
             let mutex_main = Arc::clone(&mutex_server);
-
 
             println!("Lauching server thread");
             tokio::spawn(async move {
@@ -262,20 +256,20 @@ mod tests {
             });
 
             mutex_main.acquire().await.unwrap();
-            
+
             println!("Lauching client thread");
-           
-                let mut client: ParallelClient =
-                    ParallelClient::new(String::from("127.0.0.1:8891"), "Hello World!".to_string());
-                client.add_files(vec!["tata".to_string()]);
-                println!("Client going to start");
-                let res = client.start_client().await;
-                println!("Client finish");
+
+            let mut client: ParallelClient =
+                ParallelClient::new(String::from("127.0.0.1:8891"), "Hello World!".to_string());
+            client.add_files(vec!["tata".to_string()]);
+            println!("Client going to start");
+            let res = client.start_client().await;
+            println!("Client finish");
 
             if let Ok(s) = res {
                 assert_eq!(s, "Hello World!");
                 let mut f = File::open("tmp/tata").unwrap();
-                let mut data : Vec<u8> = Vec::new();
+                let mut data: Vec<u8> = Vec::new();
                 f.read_to_end(&mut data).unwrap();
 
                 assert_eq!(data.len(), 1000000);
@@ -289,10 +283,7 @@ mod tests {
             }
         });
 
-                    
         fs::remove_dir_all("tmp").unwrap();
         fs::remove_file("tata").unwrap();
     }
-
-    
 }

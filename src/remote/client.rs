@@ -8,12 +8,14 @@ use log::debug;
 
 use crate::remote::channel::*;
 
-pub async fn test_exchange(args: Vec<String>) {
-    let mut client: ParallelClient =
-        ParallelClient::new(String::from("127.0.0.1:4000"), args[0].clone());
-    client.start_client().await.unwrap();
-}
-
+/**
+ * Client side of a Parallel Client-Server exchange
+ * - `request : String` - Request that we want to execute
+ * - `files : Vec<String>` - List of file needed for the request's execution
+ * - `request_response : String` - Use to store the request's result sent
+ * by the Server
+ * - `server_address : String` - Server address, example : "127.0.0.1:8080"
+ */
 pub struct ParallelClient {
     // Request that our Client is going to send
     request: String,
@@ -28,8 +30,16 @@ pub struct ParallelClient {
     server_address: String,
 }
 
+/**
+ * ParallelClient functions implementation
+ */
 impl ParallelClient {
-    // Default Parralel Client constructor
+    /**
+     * Create a new parallel client using the given arguments
+     * # Arguments
+     * - `server_address` - Server address
+     * - `request` - Request
+     */
     pub fn new(server_address: String, request: String) -> Self {
         ParallelClient {
             request,
@@ -41,14 +51,26 @@ impl ParallelClient {
         }
     }
 
-    // Set the list of files needed by the Server
+    /**
+     * Modify the current interest of the channel
+     * # Arguments
+     * - `interest` - New interest of the Channel
+     */
     pub fn add_files(&mut self, f: Vec<String>) {
         self.files = f;
     }
 
-    // Main function for Client
-    // Will try to connect to server and then prepare the Channel
-    // in order to launch the exchange_loop()
+    /**
+     * Main function for the Client
+     * Will try to connect to server and then prepare the Channel
+     * in order to launch the exchange_loop()
+     *
+     * Will return an Ok() result containing the request's execution
+     * result
+     *
+     * If an error occured, will return an Err() result containing
+     * a String describing the kind of error
+     */
     pub async fn start_client(&mut self) -> Result<String, String> {
         // Try to connect to the Server
         let res_connection = TcpStream::connect(self.server_address.clone()).await;
@@ -82,7 +104,14 @@ impl ParallelClient {
     }
 }
 
+/**
+ * ChannelListener implementation for the Client
+ */
 impl ChannelListener for ParallelClient {
+    /** Method invoked when a message has been fully read
+     * If this returns an option Some the Channel will change his
+     * interest to Write
+     */
     fn received(&mut self, buffer: Vec<u8>) -> Option<Vec<u8>> {
         // Convert the received buffer into a String using an utf-8 format
         let response: String = String::from_utf8(buffer).unwrap();
@@ -125,6 +154,10 @@ impl ChannelListener for ParallelClient {
         }
     }
 
+    /** Method invoked when a message has been fully sent
+     * If this returns an option Some the Channel will change his
+     * interest to Read
+     */
     fn sent(&mut self) -> Option<()> {
         Some(())
     }

@@ -1,6 +1,6 @@
 use std::io;
-use tokio::io::Ready;
 use tokio::io::Interest;
+use tokio::io::Ready;
 use tokio::net::TcpStream;
 
 use log::debug;
@@ -11,15 +11,15 @@ use log::debug;
  */
 pub trait ChannelListener: std::marker::Send {
     /** Method invoked when a message has been fully read
-    * If this returns an option Some the Channel will change his
-    * interest to Write
-    */
+     * If this returns an option Some the Channel will change his
+     * interest to Write
+     */
     fn received(&mut self, buffer: Vec<u8>) -> Option<Vec<u8>>;
 
     /** Method invoked when a message has been fully sent
-    * If this returns an option Some the Channel will change his
-    * interest to Read
-    */
+     * If this returns an option Some the Channel will change his
+     * interest to Read
+     */
     fn sent(&mut self) -> Option<()>;
 }
 
@@ -33,7 +33,7 @@ pub trait ChannelListener: std::marker::Send {
  * variable
  * - `socket : TcpStream` - Socket use by this side of the Channel to
  * communication with the other side
- * - `listener : Option<&'a mut dyn ChannelListener>` - Option struct 
+ * - `listener : Option<&'a mut dyn ChannelListener>` - Option struct
  * which can contain a reference to the ChannelListener
  * - `running : bool` - Boolean allowing to know if the Channel is running
  * or not
@@ -46,7 +46,7 @@ pub struct Channel<'a> {
     /// Ready struct, used to know if we're looking to read or write
     ready: Ready,
 
-    interest : Interest,
+    interest: Interest,
 
     /// Socket linked to this channel
     socket: TcpStream,
@@ -58,13 +58,16 @@ pub struct Channel<'a> {
     running: bool,
 }
 
+/***
+ * Channel function implementation
+ */
 impl<'a> Channel<'a> {
     /**
-    * Return a new Channel set with the given socket
-    * # Attributs
-    * - `socket : TcpStream` - Socket created by the Client or the
-    * Server and then given to the Channel
-    */
+     * Return a new Channel set with the given socket
+     * # Attributs
+     * - `socket : TcpStream` - Socket created by the Client or the
+     * Server and then given to the Channel
+     */
     pub fn new(socket: TcpStream) -> Self {
         Channel {
             read_buf: Vec::new(),
@@ -72,7 +75,7 @@ impl<'a> Channel<'a> {
 
             ready: Ready::EMPTY,
 
-            interest : Interest::READABLE,
+            interest: Interest::READABLE,
 
             socket: socket,
 
@@ -82,30 +85,61 @@ impl<'a> Channel<'a> {
         }
     }
 
-    /// Modify the current interest of the Channel
+    /**
+     * Modify the current interest of the channel
+     * # Arguments
+     * - `interest` - New interest of the Channel
+     */
     pub fn set_interest(&mut self, interest: Interest) {
         self.interest = interest;
     }
 
-    /// Set the listener of this Channel
+    /**
+     * Modify the current listiner of the channel
+     * # Arguments
+     * - `listener` - New listener of the Channel
+     */
     pub fn set_listener(&mut self, listener: &'a mut dyn ChannelListener) {
         self.listener = Some(listener);
     }
 
-    /// Close the channel
-    pub fn close(&mut self) {
+    /**
+     * Close the Channel
+     * Will set the ready field on EMPTY and
+     * will set the running field on false
+     */
+    fn close(&mut self) {
         debug!("Closing channel");
         self.running = false;
         self.ready = Ready::EMPTY;
     }
 
-    /// Prepare the write_buf
-    /// Clone the given buffer
+    /**
+     * Will set the write_buf field with the given
+     * Vec<u8> buffer
+     * # Arguments
+     * - `buf` - Buffer containing the datat we want to send
+     */
     pub fn send(&mut self, buf: Vec<u8>) {
-        self.write_buf = buf.clone();
-        debug!("Sending : {}", String::from_utf8(self.write_buf.clone()).unwrap());
+        self.write_buf = buf;
+        debug!(
+            "Sending : {}",
+            String::from_utf8(self.write_buf.clone()).unwrap()
+        );
     }
 
+    /**
+     * Main loop of the Channel
+     *
+     * This is designed to send and receive until we
+     * close this Channel
+     *
+     * Will return an empty Ok(()) result if everything has been
+     * done well
+     * If not, this will return an Err() result containing a String
+     * indicating what kind of error happened
+     *
+     */
     pub async fn exchange_loop(&mut self) -> Result<(), String> {
         let mut size_response: u64 = 0;
         let mut size_request: u64 = 0;
@@ -115,19 +149,18 @@ impl<'a> Channel<'a> {
         let mut data = vec![0; 1024];
         let mut size = vec![0; 8];
 
-        let mut size_array = [0;8];
+        let mut size_array = [0; 8];
         let mut size_index = 0;
 
         let mut size_sent = 0;
 
         while self.running {
-
             self.ready = self.socket.ready(self.interest).await.unwrap();
 
             if self.ready.is_readable() {
                 // Vec size can be modified to read more bytes
                 // during each iteration
-                
+
                 let read_result;
 
                 // If size_request is equal to 0 it means
@@ -146,24 +179,22 @@ impl<'a> Channel<'a> {
                             // Retrieve the 8 bytes, and convert it to an u64
                             // using the native endianness
                             for i in size_index..n {
-                                size_array[i] = size[i-size_index];
+                                size_array[i] = size[i - size_index];
                             }
                             size_index += n;
                             //size.clear();
 
                             if size_index == 8 {
                                 size_request = u64::from_ne_bytes(size_array);
-                                size_array = [0;8];
+                                size_array = [0; 8];
                                 size_index = 0;
                             }
-
                         } else if size_request > 0 {
                             // Retrieve each bytes and put it the reader buffer
                             for i in 0..n {
                                 self.read_buf.push(data[i]);
                             }
 
-                     
                             size_request = size_request - (n as u64);
                             //data.clear();
 
@@ -203,7 +234,6 @@ impl<'a> Channel<'a> {
                         }
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                       
                         continue;
                     }
                     Err(e) => {
@@ -215,7 +245,6 @@ impl<'a> Channel<'a> {
 
             // Write part
             if self.ready.is_writable() {
-                
                 // If size_response is equal to 0, it means
                 // that we haven't read the size yet
                 if size_response == 0 {
@@ -223,14 +252,12 @@ impl<'a> Channel<'a> {
                     match self.socket.try_write(&mut size_response.to_ne_bytes()) {
                         Ok(n) => {
                             size_sent += n;
-                            
+
                             if n == 0 {
                                 return Err(String::from("Channel has been closed"));
                             }
-
                         }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                            
                             continue;
                         }
                         Err(_e) => {
@@ -241,19 +268,17 @@ impl<'a> Channel<'a> {
                 // If size_response isn't equal to 0, we can skip to
                 // reading data part
                 } else {
-
                     if size_sent != 8 {
                         let size_to_sent = &size_response.to_ne_bytes()[size_sent..];
                         match self.socket.try_write(size_to_sent) {
                             Ok(n) => {
                                 size_sent += n;
-    
+
                                 if n == 0 {
                                     return Err(String::from("Channel has been closed"));
                                 }
                             }
                             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                                
                                 continue;
                             }
                             Err(_e) => {
@@ -282,7 +307,6 @@ impl<'a> Channel<'a> {
                             }
                         }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                
                             continue;
                         }
                         Err(_e) => {
