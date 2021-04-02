@@ -35,19 +35,20 @@ impl Parallel {
      * Returns the structure allowing the parsing and the execution of the command.
      * Initialize the job manager.
      * # Attributs
+     * - `shell : String` - the shell from the given environment, will be used to launch jobs
      * - `args: Vec<String>` - word table representing the command to be executed
      */
-    pub fn new(args: Vec<String>) -> Parallel {
+    pub fn new(shell: String, args: Vec<String>) -> Parallel {
         if args.len() == 0 {
             Parallel::print_usage();
             process::exit(0);
         }
 
-        let job_manager: JobManager = JobManager::new();
-        let mut command = String::from("parallel");
+        let job_manager: JobManager = JobManager::new(shell);
+        let mut command = String::from("");
         for arg in args {
-            command.push(' ');
             command.push_str(&arg);
+            command.push(' ');
         }
 
         Parallel { job_manager, command }
@@ -99,7 +100,8 @@ impl Parallel {
             Ok(result) => result,
             Err(error) => {
                 eprintln!("Error : {}", error);
-                return;
+                Parallel::print_usage();
+                process::exit(0);
             }, 
         };
 

@@ -39,7 +39,7 @@ mod tests {
                 server.waiting_request().await;
             });
 
-            mutex_main.acquire().await.unwrap();
+            let _ = mutex_main.acquire().await.unwrap();
 
             let mut client: ParallelClient =
                 ParallelClient::new(String::from("127.0.0.1:8888"), "Hello World!".to_string());
@@ -115,7 +115,7 @@ mod tests {
                 server.waiting_request().await;
             });
 
-            mutex_main.acquire().await.unwrap();
+            let _ = mutex_main.acquire().await.unwrap();
 
             let mut client: ParallelClient =
                 ParallelClient::new(String::from("127.0.0.1:8889"), "Hello World!".to_string());
@@ -185,7 +185,7 @@ mod tests {
                 server.waiting_request().await;
             });
 
-            mutex_main.acquire().await.unwrap();
+            let _ = mutex_main.acquire().await.unwrap();
 
             println!("Lauching client thread");
 
@@ -255,7 +255,7 @@ mod tests {
                 server.waiting_request().await;
             });
 
-            mutex_main.acquire().await.unwrap();
+            let _ = mutex_main.acquire().await.unwrap();
 
             println!("Lauching client thread");
 

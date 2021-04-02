@@ -29,6 +29,7 @@ use futures::future;
  * ```
  */
 pub struct JobManager {
+    pub shell: String, //the shell used to launch jobs
     cmds: Vec<Job>,
     nb_thread: Option<usize>,
     dry_run : bool,
@@ -57,8 +58,9 @@ impl JobManager {
      * - `dry_run` - false
      * - `keep_order` - false
      */
-    pub fn new() -> JobManager {
+    pub fn new(shell: String) -> JobManager {
         JobManager {
+            shell: shell,
             cmds: vec![],
             nb_thread: None,
             dry_run : false,
@@ -185,7 +187,11 @@ impl JobManager {
                         }
                     },
                     // the command is uncorrect
-                    Err(e) => e.to_string()
+                    Err(e) => {
+                        let mut msg = String::from(e.to_string());
+                        msg.push_str("\n");
+                        msg
+                    }
                 };
 
                 if self.keep_order {
@@ -217,7 +223,7 @@ mod tests {
     static NB_THREAD : Option<usize> = Some(5);
 
     fn init_jm (nb : Option<usize>, d_r : bool, k_o : bool) -> JobManager {
-        let mut jobmanager = JobManager::new();
+        let mut jobmanager = JobManager::new(String::from("/bin/bash"));
         jobmanager.set_exec_env(nb, d_r, k_o);
 
         jobmanager

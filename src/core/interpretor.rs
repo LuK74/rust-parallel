@@ -112,7 +112,7 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
         }
     }
 
-    // TODO : add input in separators values.
+    // TODO : add pipe input in separators values.
 
     if separators.len() > 0 {
         // to properly imbricate the loops that will be used to create 
@@ -136,8 +136,11 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
 }
 
 fn create_job(job_man : &mut JobManager, command : &str) {
-    let job = Job::new(command.split_whitespace().map(String::from).collect());
-    job_man.add_job(job);
+    // the job will be executed in the given shell from the job_manager.
+    let mut new_shell_job = vec![String::from(job_man.shell.as_str())];
+    new_shell_job.push(String::from("-c"));
+    new_shell_job.push(String::from(command));
+    job_man.add_job(Job::new(new_shell_job));
 }
 
 fn create_all_jobs(job_man : &mut JobManager, combinations : &Vec<Vec<&str>>, command_pattern : String) {
@@ -152,8 +155,9 @@ fn create_all_jobs(job_man : &mut JobManager, combinations : &Vec<Vec<&str>>, co
         let mut combo = String::from("");
         for value in combination {
             combo.push_str(value);
-            if combination.last().unwrap() != value { combo.push(' '); }
+            combo.push(' ');
         }
+        combo = combo.trim_end().to_string();
 
         // we check if actual targets exist
         let mut target_exists = false;
@@ -180,7 +184,8 @@ fn create_all_jobs(job_man : &mut JobManager, combinations : &Vec<Vec<&str>>, co
                     match braces_content {
                         Ok(value)  => {
                             if value <= combination.len() {
-                                command.replace_range(open_braces..=close_braces, combination[value - 1]);
+                                let index = if value > 0 { value - 1 } else { 0 /*{0} is considered as {1} in parallel*/ };
+                                command.replace_range(open_braces..=close_braces, combination[index]);
                             } else {
                                 // The value is above the separator's index
                                 // ex : specifying target {3} while only two dimensions were specified.
@@ -224,14 +229,14 @@ mod tests {
 
     #[test]
     fn builder_test1() {
-        let mut jm = JobManager::new();
+        let mut jm = JobManager::new(String::from("/bin/bash"));
         // All parses below should succeed !
-        let mut parsing_result1 = super::super::parser::parse("parallel echo ::: 1 2 3").unwrap();
-        let mut parsing_result2 = super::super::parser::parse("parallel echo -i{2} -{2}{1} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
-        let mut parsing_result3 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
-        let mut parsing_result4 = super::super::parser::parse("parallel --jobs 5 --dry-run echo -i {1}{} ok';'wc -l").unwrap();
+        let mut parsing_result1 = super::super::parser::parse("echo ::: 1 2 3").unwrap();
+        let mut parsing_result2 = super::super::parser::parse("echo -i{2} -{2}{1} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
+        let mut parsing_result3 = super::super::parser::parse("--jobs 5 --dry-run echo -i {1}{} ok';'wc -l ::: 1 2 3 ::: 4 5 6").unwrap();
+        let mut parsing_result4 = super::super::parser::parse("--jobs 5 --dry-run echo -i {1}{} ok';'wc -l").unwrap();
         // With parallel there are no issues specifying multiple times the same option
-        let mut parsing_result5 = super::super::parser::parse("parallel --keep-order --dry-run --jobs 5 --jobs 3 echo -i {2}{} ok';'wc -l ::: 1 2 3").unwrap();
+        let mut parsing_result5 = super::super::parser::parse("--keep-order --dry-run --jobs 5 --jobs 3 echo -i {2}{} ok';'wc -l ::: 1 2 3").unwrap();
         // And so the interpretation must not panic !
         let _ = interpret(&mut jm, &mut parsing_result1);
         let _ = interpret(&mut jm, &mut parsing_result2);
@@ -242,9 +247,9 @@ mod tests {
 
     #[test]
     fn builder_test2() {
-        let mut jm = JobManager::new();
+        let mut jm = JobManager::new(String::from("/bin/bash"));
         // "parallel echo :::" Must pass throught parsing but not interpretation
-        let mut parsing_result6 = super::super::parser::parse("parallel echo :::").unwrap();
+        let mut parsing_result6 = super::super::parser::parse("echo :::").unwrap();
         match interpret(&mut jm, &mut parsing_result6) {
             Err(InterpretError::NoData(_)) => (),
             _ => panic!()
@@ -253,9 +258,9 @@ mod tests {
 
     #[test]
     fn builder_test3() {
-        let mut jm = JobManager::new();
+        let mut jm = JobManager::new(String::from("/bin/bash"));
         // "parallel --help echo ::: 1 2 3" Must pass throught parsing but not interpretation
-        let mut parsing_result6 = super::super::parser::parse("parallel --help echo ::: 1 2 3").unwrap();
+        let mut parsing_result6 = super::super::parser::parse("--help echo ::: 1 2 3").unwrap();
         match interpret(&mut jm, &mut parsing_result6) {
             Err(InterpretError::Help) => (),
             _ => panic!()
