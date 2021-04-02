@@ -184,7 +184,8 @@ fn create_all_jobs(job_man : &mut JobManager, combinations : &Vec<Vec<&str>>, co
                     match braces_content {
                         Ok(value)  => {
                             if value <= combination.len() {
-                                command.replace_range(open_braces..=close_braces, combination[value - 1]);
+                                let index = if value > 0 { value - 1 } else { 0 /*{0} is considered as {1} in parallel*/ };
+                                command.replace_range(open_braces..=close_braces, combination[index]);
                             } else {
                                 // The value is above the separator's index
                                 // ex : specifying target {3} while only two dimensions were specified.
