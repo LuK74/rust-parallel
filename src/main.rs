@@ -22,7 +22,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn lib_test() {
         let _ = env_logger::builder().is_test(true).try_init();

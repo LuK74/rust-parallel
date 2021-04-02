@@ -1,9 +1,9 @@
 extern crate tokio;
 use log::debug;
 use std::fmt;
-use tokio::process::Command;
-use std::thread;
 use std::process;
+use std::thread;
+use tokio::process::Command;
 
 /**
  * Representation of the command execution environment :
@@ -27,7 +27,7 @@ pub struct Job {
 }
 
 /***
- * Allow to display all information about the current job. 
+ * Allow to display all information about the current job.
  */
 impl fmt::Display for Job {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -68,7 +68,7 @@ impl Job {
      * either the standard output if the execution was successful or an error.
      */
     pub async fn exec(&mut self) -> Result<process::Output, std::io::Error> {
-        debug!("{} {:?}",process::id(), thread::current().id());
+        debug!("{} {:?}", process::id(), thread::current().id());
 
         // Create a new tokio command with the linux command name
         let mut command: Command = Command::new(self.cmd.clone());
@@ -78,8 +78,8 @@ impl Job {
             command.arg(&arg.clone());
         }
 
-        // A future is a value that may not have finished computing yet. 
-        // This kind of "asynchronous value" makes it possible for a thread to continue doing useful work 
+        // A future is a value that may not have finished computing yet.
+        // This kind of "asynchronous value" makes it possible for a thread to continue doing useful work
         // while it waits for the value to become available.
         let future = command.output();
         debug!("<{}> spawn", self);
@@ -98,10 +98,10 @@ impl Job {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::runtime::{Builder, Runtime};
     use tokio::process::Child;
+    use tokio::runtime::{Builder, Runtime};
 
-    fn init (nb_thread : Option<usize>) -> Runtime {
+    fn init(nb_thread: Option<usize>) -> Runtime {
         let mut runtime_builder: Builder = Builder::new_multi_thread();
         runtime_builder.enable_all();
         let runtime: Runtime = match nb_thread {
@@ -119,7 +119,7 @@ mod tests {
         let runtime = init(Some(5));
 
         runtime.block_on(async {
-            let _cmd : Child = Command::new(String::from("echo"))
+            let _cmd: Child = Command::new(String::from("echo"))
                 .arg(String::from("Hello World"))
                 .spawn()
                 .unwrap();
@@ -134,11 +134,10 @@ mod tests {
         let runtime = init(Some(5));
 
         runtime.block_on(async {
-            let _cmd : Child = Command::new(String::from("echo Hello World"))
+            let _cmd: Child = Command::new(String::from("echo Hello World"))
                 .spawn()
                 .unwrap();
         });
-
     }
 
     #[test]
@@ -149,9 +148,7 @@ mod tests {
         let runtime = init(Some(5));
 
         runtime.block_on(async {
-            let _cmd : Child = Command::new(String::from("unknown_cmd"))
-                .spawn()
-                .unwrap();
+            let _cmd: Child = Command::new(String::from("unknown_cmd")).spawn().unwrap();
         });
     }
 }

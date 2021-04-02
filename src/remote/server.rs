@@ -1,7 +1,9 @@
+use crate::parallel::Parallel;
 use tokio::io::Interest;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 
+use std::env;
 use std::fs::OpenOptions;
 use std::fs::{self, DirBuilder};
 use std::io::Write;
@@ -325,7 +327,29 @@ impl ChannelListener for ParallelWorker {
 
                 // put the request result in this variable
                 debug!("Server : request received : {}", self.request);
-                self.request_result = self.request.clone();
+
+                let shell = match env::var("SHELL") {
+                    Ok(val) => val,
+                    Err(e) => {
+                        eprintln!("Couldn't interpret environment variable SHELL: {}", e);
+                        return None;
+                    }
+                };
+
+                let args: Vec<String> = self
+                    .request
+                    .split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect();
+
+                let mut prg = Parallel::new(shell, args);
+                self.request_result = String::new();
+                if let Some(results) = prg.start() {
+                    for result in results {
+                        self.request_result.push_str(&result);
+                    }
+                }
+
                 debug!("Server : result of request : {}", self.request_result);
 
                 self.state = WorkerState::SendingResult;

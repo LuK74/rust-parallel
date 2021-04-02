@@ -83,7 +83,10 @@ impl ParallelClient {
             // by the TcpStream::connect method
             channel = Channel::new(s);
         } else {
-            panic!("Couldn't connect to the server");
+            panic!(
+                "Couldn't connect to the server, server address : {}",
+                self.server_address
+            );
         }
 
         // If the list of files needed by the server is empty we can
