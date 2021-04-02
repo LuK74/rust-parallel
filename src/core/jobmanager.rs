@@ -33,7 +33,9 @@ pub struct JobManager {
     cmds: Vec<Job>,
     nb_thread: Option<usize>,
     dry_run : bool,
-    keep_order : bool
+    keep_order : bool,
+    local_port : Option<usize>,
+    remote_addr : Option<(String, usize)>,
 }
 
 /***
@@ -64,7 +66,9 @@ impl JobManager {
             cmds: vec![],
             nb_thread: None,
             dry_run : false,
-            keep_order : false
+            keep_order : false,
+            remote_addr : None,
+            local_port : None,
         }
     }
 
@@ -87,13 +91,17 @@ impl JobManager {
      * `d_r` and `k_o` can take true|false values.
      * `nb` can take Some(uzise)|None values but in case of Some(0) the value realy given to the manager is None
      */
-    pub fn set_exec_env (&mut self, nb : Option<usize>, d_r : bool, k_o : bool) {
+    pub fn set_exec_env (&mut self, nb : Option<usize>, d_r : bool, 
+                         k_o : bool, src_port : Option<usize>, 
+                         dst_addr : Option<(String, usize)>) {
         self.nb_thread = match nb {
             None|Some(0) => None,
             Some(_) => nb
         };
         self.dry_run = d_r;
         self.keep_order = k_o;
+        self.local_port = src_port;
+        self.remote_addr = dst_addr;
     }
 
     /**
@@ -224,7 +232,7 @@ mod tests {
 
     fn init_jm (nb : Option<usize>, d_r : bool, k_o : bool) -> JobManager {
         let mut jobmanager = JobManager::new(String::from("/bin/bash"));
-        jobmanager.set_exec_env(nb, d_r, k_o);
+        jobmanager.set_exec_env(nb, d_r, k_o, None, None);
 
         jobmanager
     }

@@ -16,16 +16,17 @@ use pest::iterators::Pairs;
 pub enum InterpretError {
     Help,
     NoData(String),
+    BothSourceAndRemote(String),
 }
 
 /// Builds all the possible combinations according to sep_val values.
 /// 
 /// ## PARAMS
-/// - builds: the list containing all separators combinations
-/// - sep_ord: vector of separators' order according to the number of elements
-/// - depth: the depth in sep_ord (up to sep_val.len() - 1)
-/// - sep_val: contains all the values of each separator
-/// - curr_build: the current building combination of values
+/// - `builds`: the list containing all separators combinations
+/// - `sep_ord`: vector of separators' order according to the number of elements
+/// - `depth`: the depth in sep_ord (up to sep_val.len() - 1)
+/// - `sep_val`: contains all the values of each separator
+/// - `curr_build`: the current building combination of values
 fn build_combinations<'a>(builds: &mut Vec<Vec<&'a str>>, sep_ord: & Vec<usize>, 
                           depth: usize, sep_val: & Vec<Vec<&'a str>>, curr_build: Vec<&'a str>) {
     for i_value in 0..sep_val[sep_ord[depth]].len() {
@@ -71,6 +72,8 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
     let mut nb_thread: Option<usize> = None;
     let mut dry_run : bool = false;
     let mut keep_order : bool = false;
+    let mut src_port : Option<usize/*port number*/> = None; //server side
+    let mut dst_addr : Option<(String/*address*/, usize/*port number*/)> = None; //client side
 
     let mut separators : Vec<Vec<&str>> = Vec::new();
     let mut command_pattern : String = String::from("");
@@ -82,9 +85,12 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
                 match opt_iter.next().unwrap() {
                     "--keep-order" => keep_order = true,
                     "--dry-run" => dry_run = true,
-                    // Never fails because the parse succeeded.
+                    // The parsed numbers (--jobs/-j/--server) and strings (--client) never fails because the parse succeeded.
                     "--jobs" | "-j" => nb_thread = Some(opt_iter.next().unwrap().parse::<usize>().unwrap()),
-                    "--pipe" => /*has no effect yet.*/(),
+                    "--client" => dst_addr = Some((opt_iter.next().unwrap().parse::<String>().unwrap(), 
+                                                   opt_iter.next().unwrap().parse::<usize>().unwrap())),
+                    "--server" => src_port = Some(opt_iter.next().unwrap().parse::<usize>().unwrap()),
+                    "--pipe" => /*not yet implemented.*/(),
                     "--help" => return Err(InterpretError::Help),
                     _ => unreachable!(),
                 }
@@ -112,6 +118,12 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
         }
     }
 
+    if src_port.is_some() && dst_addr.is_some() {
+        return Err(InterpretError::BothSourceAndRemote(String::from(
+            "You can't be the server and the client at the same time."
+        )));
+    }
+
     // TODO : add pipe input in separators values.
 
     if separators.len() > 0 {
@@ -128,10 +140,14 @@ pub fn interpret(job_man : &mut JobManager , inputs: &mut Pairs<Rule> ) -> Resul
         // Create all jobs here from the command's pattern
         create_all_jobs(job_man, &combinations, command_pattern);
     } else {
-        return Err(InterpretError::NoData(String::from("you forgot ::: or to pipe data into parallel")));
+        if src_port.is_none() {
+            return Err(InterpretError::NoData(String::from(
+                "You forgot ::: or to pipe data into parallel"
+            )));
+        }
     }
 
-    job_man.set_exec_env(nb_thread, dry_run, keep_order);
+    job_man.set_exec_env(nb_thread, dry_run, keep_order, src_port, dst_addr);
     Ok(())
 }
 
@@ -263,6 +279,28 @@ mod tests {
         let mut parsing_result6 = super::super::parser::parse("--help echo ::: 1 2 3").unwrap();
         match interpret(&mut jm, &mut parsing_result6) {
             Err(InterpretError::Help) => (),
+            _ => panic!()
+        }
+    }
+
+    #[test]
+    fn builder_test4() {
+        let mut jm = JobManager::new(String::from("/bin/bash"));
+        // Test remote parsing and interpretion (should not panic at all)
+        let mut parsing_result1 = super::super::parser::parse("--client 127.0.0.1 2021 ::: 1").unwrap();
+        let mut parsing_result2 = super::super::parser::parse("--server 2021 ::: 1").unwrap();
+        let _ = interpret(&mut jm, &mut parsing_result1);
+        let _ = interpret(&mut jm, &mut parsing_result2);
+
+        // Now testing the double specification, must pass throught parsing but not interpretation
+        let mut parsing_result3 = super::super::parser::parse("--client 127.0.0.1 2021 --server 2021 ::: 1").unwrap();
+        let mut parsing_result4 = super::super::parser::parse("--server 2021 --client 127.0.0.1 2021 ::: 1").unwrap();
+        match interpret(&mut jm, &mut parsing_result3) {
+            Err(InterpretError::BothSourceAndRemote(_)) => (),
+            _ => panic!()
+        }
+        match interpret(&mut jm, &mut parsing_result4) {
+            Err(InterpretError::BothSourceAndRemote(_)) => (),
             _ => panic!()
         }
     }
