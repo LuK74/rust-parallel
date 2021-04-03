@@ -342,9 +342,10 @@ impl ChannelListener for ParallelWorker {
                     .map(|s| s.to_string())
                     .collect();
 
-                let mut prg = Parallel::new(shell, args);
+                let prg = Parallel::new(shell, args);
                 self.request_result = String::new();
                 if let Some(results) = prg.start() {
+                    println!("Results finished");
                     for result in results {
                         self.request_result.push_str(&result);
                     }

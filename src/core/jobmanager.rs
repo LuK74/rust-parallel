@@ -6,6 +6,7 @@ use log::debug;
 use std::fmt;
 use std::process;
 use std::thread;
+use tokio::runtime::Handle;
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -129,7 +130,7 @@ impl JobManager {
      *
      * In case dry run is requested, then the other parameters are not very useful, we only display the commands.
      */
-    pub fn exec(&mut self) -> Option<Vec<String>> {
+    pub fn exec(mut self) -> Option<Vec<String>> {
         if self.dry_run {
             self.dry_run();
             return None;
@@ -138,6 +139,7 @@ impl JobManager {
             let mut address = ip_addr.0.clone();
             address.push(':');
             address.push_str(&port_string);
+
 
             let mut tokens: Vec<&str> = self.request.split_whitespace().collect();
             let mut index: usize = 0;
@@ -149,8 +151,8 @@ impl JobManager {
                 index += 1;
             }
             tokens.remove(index);
-            tokens.remove(index + 1);
-            tokens.remove(index + 2);
+            tokens.remove(index);
+            tokens.remove(index);
 
             let mut new_request: String = String::new();
             for token in tokens {
@@ -164,6 +166,7 @@ impl JobManager {
                 let mut client: ParallelClient =
                     ParallelClient::new(String::from(address), new_request);
                 let res = client.start_client().await;
+                println!("Result of the request :");
                 println!("{}", res.unwrap());
             });
 
@@ -177,7 +180,7 @@ impl JobManager {
             runtime_builder.enable_all();
             let runtime = match self.nb_thread {
                 None => runtime_builder.build().unwrap(),
-                Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
+                Some(n) => runtime_builder.worker_threads(n + 1).build().unwrap(),
             };
 
             runtime.block_on(async {
@@ -210,91 +213,174 @@ impl JobManager {
      * and asynchronously retrieve the standard output of the threads in order to display them
      * (using the order if requested)
      */
-    fn exec_all(&mut self) -> Vec<String> {
+    fn exec_all(mut self) -> Vec<String> {
         debug!("{} {:?}", process::id(), thread::current().id());
 
         // Create a asynchronous tokio runtime with the given number of thread.
         // Threads work as consumer producers
-        let mut runtime_builder: Builder = Builder::new_multi_thread();
-        runtime_builder.enable_all();
-        let runtime: Runtime = match self.nb_thread {
-            None => runtime_builder.build().unwrap(),
-            Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
-        };
 
-        let nb_cmd = self.cmds.len();
+        if let Err(_e) = Handle::try_current() {
+            let mut runtime_builder: Builder = Builder::new_multi_thread();
+            runtime_builder.enable_all();
+            let runtime: Runtime = match self.nb_thread {
+                None => runtime_builder.build().unwrap(),
+                Some(n) => runtime_builder.worker_threads(n).build().unwrap(),
+            };
 
-        // Run all command into the runtime previously created.
-        return runtime.block_on(async {
-            debug!("{} {:?}", process::id(), thread::current().id());
-            debug!("start block_on");
+            let nb_cmd = self.cmds.len();
 
-            // Allows to keep access to the different tasks given to the threads.
-            let mut tasks: Vec<JoinHandle<_>> = vec![];
+            // Run all command into the runtime previously created.
+            let result = futures::executor::block_on(runtime.spawn(async move {
+                debug!("{} {:?}", process::id(), thread::current().id());
+                debug!("start block_on");
 
-            // mpsc = multi producer single consumer
-            // allow to the main thread to retrieve the output of child threads
-            let (tx, mut rx) = mpsc::channel::<(i32, Result<process::Output, std::io::Error>)>(1);
+                // Allows to keep access to the different tasks given to the threads.
+                let mut tasks: Vec<JoinHandle<_>> = vec![];
 
-            // allows to keep the execution order
-            let mut order: i32 = 0;
+                // mpsc = multi producer single consumer
+                // allow to the main thread to retrieve the output of child threads
+                let (tx, mut rx) =
+                    mpsc::channel::<(i32, Result<process::Output, std::io::Error>)>(1);
 
-            // for each command/job
-            for mut cmd in self.cmds.drain(..) {
-                // create new producer
-                let tx_task = tx.clone();
+                // allows to keep the execution order
+                let mut order: i32 = 0;
 
-                // gives a new task to the runtime which executes the command and get output asynchronoulsy
-                let task = tokio::spawn(async move {
-                    let output = cmd.exec().await;
-                    tx_task.send((order, output)).await.unwrap();
-                });
-                tasks.push(task);
-                order += 1;
-            }
+                // for each command/job
+                for mut cmd in self.cmds.drain(..) {
+                    // create new producer
+                    let tx_task = tx.clone();
 
-            // allows to wait for the output of all commands and to store them
-            // either in the order of arrival or in the order of execution (if requested => keep order)
-            let mut counter: usize = 0;
-            let mut messages = vec![Default::default(); nb_cmd]; // create Vector with default value
-            while counter < nb_cmd {
-                let (order, result) = rx.recv().await.unwrap();
-                let message: String = match result {
-                    // if the command is correct
-                    Ok(output) => {
-                        // if the command was executed successfully
-                        if output.status.success() {
-                            String::from_utf8(output.stdout.clone()).unwrap()
-                        } else {
-                            String::from_utf8(output.stderr.clone()).unwrap()
-                        }
-                    }
-                    // the command is uncorrect
-                    Err(e) => {
-                        let mut msg = String::from(e.to_string());
-                        msg.push_str("\n");
-                        msg
-                    }
-                };
-
-                if self.keep_order {
-                    messages[order as usize] = message;
-                } else {
-                    messages[counter] = message;
+                    // gives a new task to the runtime which executes the command and get output asynchronoulsy
+                    let task = tokio::spawn(async move {
+                        let output = cmd.exec().await;
+                        tx_task.send((order, output)).await.unwrap();
+                    });
+                    tasks.push(task);
+                    order += 1;
                 }
-                counter += 1;
-            }
 
-            // display output message
-            for i in 0..messages.len() {
-                print!("{}", messages[i]);
-            }
+                // allows to wait for the output of all commands and to store them
+                // either in the order of arrival or in the order of execution (if requested => keep order)
+                let mut counter: usize = 0;
+                let mut messages = vec![Default::default(); nb_cmd]; // create Vector with default value
+                while counter < nb_cmd {
+                    let (order, result) = rx.recv().await.unwrap();
+                    let message: String = match result {
+                        // if the command is correct
+                        Ok(output) => {
+                            // if the command was executed successfully
+                            if output.status.success() {
+                                String::from_utf8(output.stdout.clone()).unwrap()
+                            } else {
+                                String::from_utf8(output.stderr.clone()).unwrap()
+                            }
+                        }
+                        // the command is uncorrect
+                        Err(e) => {
+                            let mut msg = String::from(e.to_string());
+                            msg.push_str("\n");
+                            msg
+                        }
+                    };
 
-            future::join_all(tasks).await;
+                    if self.keep_order {
+                        messages[order as usize] = message;
+                    } else {
+                        messages[counter] = message;
+                    }
+                    counter += 1;
+                }
 
-            debug!("stop block_on");
-            return messages;
-        });
+                // display output message
+                for i in 0..messages.len() {
+                    print!("{}", messages[i]);
+                }
+
+                future::join_all(tasks).await;
+
+                debug!("stop block_on");
+                return messages;
+            }));
+
+            return result.unwrap();
+        } else {
+            let nb_cmd = self.cmds.len();
+
+            // Run all command into the runtime previously created.
+
+            let res = tokio::task::spawn_blocking(move || {
+                debug!("{} {:?}", process::id(), thread::current().id());
+                debug!("start block_on");
+
+                // Allows to keep access to the different tasks given to the threads.
+                let mut tasks: Vec<JoinHandle<_>> = vec![];
+
+                // mpsc = multi producer single consumer
+                // allow to the main thread to retrieve the output of child threads
+                let (tx, mut rx) =
+                    mpsc::channel::<(i32, Result<process::Output, std::io::Error>)>(1);
+
+                // allows to keep the execution order
+                let mut order: i32 = 0;
+
+                // for each command/job
+                for mut cmd in self.cmds.drain(..) {
+                    // create new producer
+                    let tx_task = tx.clone();
+
+                    // gives a new task to the runtime which executes the command and get output asynchronoulsy
+                    let task = tokio::spawn(async move {
+                        let output = cmd.exec().await;
+                        tx_task.send((order, output)).await.unwrap();
+                    });
+                    tasks.push(task);
+                    order += 1;
+                }
+                // allows to wait for the output of all commands and to store them
+                // either in the order of arrival or in the order of execution (if requested => keep order)
+                let mut counter: usize = 0;
+                let mut messages = vec![Default::default(); nb_cmd]; // create Vector with default value
+                while counter < nb_cmd {
+                    let (order, result) = futures::executor::block_on(rx.recv()).unwrap();
+                    let message: String = match result {
+                        // if the command is correct
+                        Ok(output) => {
+                            // if the command was executed successfully
+                            if output.status.success() {
+                                String::from_utf8(output.stdout.clone()).unwrap()
+                            } else {
+                                String::from_utf8(output.stderr.clone()).unwrap()
+                            }
+                        }
+                        // the command is uncorrect
+                        Err(e) => {
+                            let mut msg = String::from(e.to_string());
+                            msg.push_str("\n");
+                            msg
+                        }
+                    };
+
+                    if self.keep_order {
+                        messages[order as usize] = message;
+                    } else {
+                        messages[counter] = message;
+                    }
+                    counter += 1;
+                }
+
+
+                // display output message
+                for i in 0..messages.len() {
+                    print!("{}", messages[i]);
+                }
+
+                futures::executor::block_on(future::join_all(tasks));
+
+                debug!("stop block_on");
+                return messages;
+            });
+            return futures::executor::block_on(res).unwrap();
+        }
     }
 }
 

@@ -15,7 +15,7 @@ fn main() {
 
     let args: Vec<String> = env::args().skip(1).collect();
 
-    let mut prg = Parallel::new(shell, args);
+    let prg = Parallel::new(shell, args);
     prg.start();
 }
 
@@ -34,7 +34,7 @@ mod tests {
             String::from("World"),
         ];
 
-        let mut prg = Parallel::new(String::from("/bin/bash"), args);
+        let prg = Parallel::new(String::from("/bin/bash"), args);
 
         prg.start();
     }

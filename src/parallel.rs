@@ -94,7 +94,7 @@ impl Parallel {
     /**
      * Parse the input command and configure the job manager with all the commands and execution options.
      */
-    pub fn start(&mut self) -> Option<Vec<String>> {
+    pub fn start(mut self) -> Option<Vec<String>> {
         // first let's store our request
         self.job_manager.set_request(self.command.clone());
 
