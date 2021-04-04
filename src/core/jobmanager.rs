@@ -135,12 +135,16 @@ impl JobManager {
             self.dry_run();
             return None;
         } else if let Some(ip_addr) = &self.remote_addr {
+            // This case corresponds to the Client side of a remote execution
             let port_string = ip_addr.1.to_string();
             let mut address = ip_addr.0.clone();
             address.push(':');
             address.push_str(&port_string);
 
 
+            // After we've collected all the information needed to launch
+            // the connection, we can remove the remote execution arguments
+            // from the request in order to send it to the Server
             let mut tokens: Vec<&str> = self.request.split_whitespace().collect();
             let mut index: usize = 0;
 
@@ -172,16 +176,14 @@ impl JobManager {
 
             return None;
         } else if let Some(port_number) = self.local_port {
+            // This case corresponds to the Server side of a remote execution
             let port_string = port_number.to_string();
             let mut address = String::from("127.0.0.1:");
             address.push_str(&port_string);
 
             let mut runtime_builder: Builder = Builder::new_multi_thread();
             runtime_builder.enable_all();
-            let runtime = match self.nb_thread {
-                None => runtime_builder.build().unwrap(),
-                Some(n) => runtime_builder.worker_threads(n + 1).build().unwrap(),
-            };
+            let runtime = runtime_builder.build().unwrap();
 
             runtime.block_on(async {
                 let mut server: ParallelServer = ParallelServer::new(address).await;
@@ -216,10 +218,13 @@ impl JobManager {
     fn exec_all(mut self) -> Vec<String> {
         debug!("{} {:?}", process::id(), thread::current().id());
 
+
+
+        // Check if a runtime already exists
+        if let Err(_e) = Handle::try_current() {
+
         // Create a asynchronous tokio runtime with the given number of thread.
         // Threads work as consumer producers
-
-        if let Err(_e) = Handle::try_current() {
             let mut runtime_builder: Builder = Builder::new_multi_thread();
             runtime_builder.enable_all();
             let runtime: Runtime = match self.nb_thread {
@@ -304,10 +309,10 @@ impl JobManager {
 
             return result.unwrap();
         } else {
+
             let nb_cmd = self.cmds.len();
 
             // Run all command into the runtime previously created.
-
             let res = tokio::task::spawn_blocking(move || {
                 debug!("{} {:?}", process::id(), thread::current().id());
                 debug!("start block_on");
@@ -379,6 +384,7 @@ impl JobManager {
                 debug!("stop block_on");
                 return messages;
             });
+            // Now we wait for the task previously created to end
             return futures::executor::block_on(res).unwrap();
         }
     }
