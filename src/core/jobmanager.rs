@@ -17,7 +17,8 @@ use futures::future;
  * # Example
  * ```rust
  * use rust_parallel::core::jobmanager::JobManager;
- * let mut jobmanager : JobManager = Jobmanager::new();
+ * use rust_parallel::core::job::Job;
+ * let mut jobmanager : JobManager = JobManager::new(String::from("/bin/bash"));
  * jobmanager.set_exec_env(Some(5), false, true); //5 threads, no "dry run", keep order
  * let args: Vec<String> = vec![
  *             String::from("echo"),

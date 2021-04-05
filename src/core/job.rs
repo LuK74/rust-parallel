@@ -17,7 +17,7 @@ use std::process;
  *             String::from("Hello"),
  *             String::from("World"),
  *         ];
- * let job : Job = Job::new(args)
+ * let mut job : Job = Job::new(args);
  * job.exec();
  * ```
  */

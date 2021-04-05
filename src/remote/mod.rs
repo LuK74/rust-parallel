@@ -17,6 +17,7 @@ mod tests {
 
     // Test a basic "Hello World !" exchange
     #[test]
+    #[ignore]
     fn test_exchange() {
         let rt = Runtime::new().unwrap();
 
@@ -62,6 +63,7 @@ mod tests {
     // Could be modified to create and delete the files needed for
     // test
     #[test]
+    #[ignore]
     fn test_file_exchange() {
         let rt = Runtime::new().unwrap();
 
@@ -147,6 +149,7 @@ mod tests {
     // Could be modified to create and delete the files needed for
     // test
     #[test]
+    #[ignore]
     fn test_duplicate_file_exchange() {
         let rt = Runtime::new().unwrap();
 
@@ -217,6 +220,7 @@ mod tests {
     // Test a basic "Hello World !" exchange
     // And the transfer of 1 file having a size of 1000000 bytes
     #[test]
+    #[ignore]
     fn test_big_file() {
         let rt = Runtime::new().unwrap();
 

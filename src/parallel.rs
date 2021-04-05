@@ -18,8 +18,8 @@ use std::process;
  *           String::from(":::"),
  *           String::from(":::"),
  *           String::from("Hello"),
- *           String::from("World"),
- * let mut prg = Parallel::new(args);
+ *           String::from("World"),];
+ * let mut prg = Parallel::new(String::from("/bin/bash"),args);
  * prg.start();
  * ```
  */
