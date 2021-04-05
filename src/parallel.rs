@@ -14,7 +14,7 @@ use std::process;
  * use rust_parallel::parallel::Parallel;
  * let args: Vec<String> = vec![
  *           String::from("echo"),
- *           String::from(":::"),
+ *           String::from("{1}"),
  *           String::from(":::"),
  *           String::from("Hello"),
  *           String::from("World"),];
