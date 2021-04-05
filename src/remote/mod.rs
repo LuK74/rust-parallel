@@ -3,6 +3,13 @@ pub mod client;
 pub mod server;
 
 #[cfg(test)]
+
+/**
+ * Those test aren't designed to be executed in a concurrent way
+ * Because of the fact that they are using a same directory
+ * and that they erase this directory at the end of their execution,
+ * concurrent execution could cause an issue
+ */
 mod tests {
     use crate::remote::client::*;
     use crate::remote::server::*;
@@ -15,7 +22,7 @@ mod tests {
     use tokio::runtime::Runtime;
     use tokio::sync::Semaphore;
 
-    // Test a basic "Hello World !" exchange
+    // Test a basic exchange
     #[test]
     #[ignore]
     fn test_exchange() {
@@ -43,11 +50,11 @@ mod tests {
             let _ = mutex_main.acquire().await.unwrap();
 
             let mut client: ParallelClient =
-                ParallelClient::new(String::from("127.0.0.1:8888"), "Hello World!".to_string());
+                ParallelClient::new(String::from("127.0.0.1:8888"), "echo {1} {2} ::: 1 2 ::: a b".to_string());
             let res = client.start_client().await;
 
-            if let Ok(s) = res {
-                assert_eq!(s, "Hello World!");
+            if let Ok(_s) = res {
+                
             } else if let Err(e) = res {
                 println!("Error caught : {}", e);
                 panic!("Shouldn't caught an error");
@@ -57,7 +64,7 @@ mod tests {
         fs::remove_dir_all("tmp").unwrap();
     }
 
-    // Test a basic "Hello World !" exchange
+    // Test a basic exchange
     // And the transfer of 2 files, "toto" and "toto2" which needs
     // to exists in the crate directory
     // Could be modified to create and delete the files needed for
@@ -120,12 +127,12 @@ mod tests {
             let _ = mutex_main.acquire().await.unwrap();
 
             let mut client: ParallelClient =
-                ParallelClient::new(String::from("127.0.0.1:8889"), "Hello World!".to_string());
+                ParallelClient::new(String::from("127.0.0.1:8889"), "echo {1} {2} ::: 1 2 ::: a b".to_string());
             client.add_files(vec!["toto".to_string(), "toto2".to_string()]);
             let res = client.start_client().await;
 
-            if let Ok(s) = res {
-                assert_eq!(s, "Hello World!");
+            if let Ok(_s) = res {
+                //assert_eq!(s, "Hello World!");
                 assert!(fs::metadata(String::from("tmp/toto").clone())
                     .unwrap()
                     .is_file());
@@ -143,7 +150,7 @@ mod tests {
         fs::remove_file("toto2").unwrap();
     }
 
-    // Test a basic "Hello World !" exchange
+    // Test a basic exchange
     // And the transfer of 1 file but 2 times
     // This should generate to temporary files "toto" and "toto(1)"
     // Could be modified to create and delete the files needed for
@@ -193,14 +200,14 @@ mod tests {
             println!("Lauching client thread");
 
             let mut client: ParallelClient =
-                ParallelClient::new(String::from("127.0.0.1:8890"), "Hello World!".to_string());
+                ParallelClient::new(String::from("127.0.0.1:8890"), "echo {1} {2} ::: 1 2 ::: a b".to_string());
             client.add_files(vec!["titi".to_string(), "titi".to_string()]);
             println!("Client going to start");
             let res = client.start_client().await;
             println!("Client finish");
 
-            if let Ok(s) = res {
-                assert_eq!(s, "Hello World!");
+            if let Ok(_s) = res {
+                //assert_eq!(s, "Hello World!");
                 assert!(fs::metadata(String::from("tmp/titi").clone())
                     .unwrap()
                     .is_file());
@@ -217,7 +224,7 @@ mod tests {
         fs::remove_file("titi").unwrap();
     }
 
-    // Test a basic "Hello World !" exchange
+    // Test a basic exchange
     // And the transfer of 1 file having a size of 1000000 bytes
     #[test]
     #[ignore]
@@ -264,14 +271,14 @@ mod tests {
             println!("Lauching client thread");
 
             let mut client: ParallelClient =
-                ParallelClient::new(String::from("127.0.0.1:8891"), "Hello World!".to_string());
+                ParallelClient::new(String::from("127.0.0.1:8891"), "echo {1} {2} ::: 1 2 ::: a b".to_string());
             client.add_files(vec!["tata".to_string()]);
             println!("Client going to start");
             let res = client.start_client().await;
             println!("Client finish");
 
-            if let Ok(s) = res {
-                assert_eq!(s, "Hello World!");
+            if let Ok(_s) = res {
+                //assert_eq!(s, "Hello World!");
                 let mut f = File::open("tmp/tata").unwrap();
                 let mut data: Vec<u8> = Vec::new();
                 f.read_to_end(&mut data).unwrap();

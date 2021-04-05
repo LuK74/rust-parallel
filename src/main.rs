@@ -15,14 +15,14 @@ fn main() {
 
     let args: Vec<String> = env::args().skip(1).collect();
 
-    let mut prg = Parallel::new(shell, args);
+    let prg = Parallel::new(shell, args);
     prg.start();
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn lib_test() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -34,7 +34,7 @@ mod tests {
             String::from("World"),
         ];
 
-        let mut prg = Parallel::new(String::from("/bin/bash"), args);
+        let prg = Parallel::new(String::from("/bin/bash"), args);
 
         prg.start();
     }

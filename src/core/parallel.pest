@@ -12,7 +12,9 @@ options = {
 | ^"--keep-order" 
 | ^"--pipe" 
 | ^"--jobs" ~ ASCII_DIGIT+ 
-| ^"-j" ~ ASCII_DIGIT+ 
+| ^"-j" ~ ASCII_DIGIT+
+| ^"--server" ~ ASCII_DIGIT+
+| ^"--client" ~ string ~ ASCII_DIGIT+
 | ^"--help" 
 }
 
