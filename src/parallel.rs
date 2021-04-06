@@ -1,5 +1,5 @@
 // #![feature(external_doc)] // for #[doc(include="../README.md")] line 59
-use crate::core::interpretor;
+use crate::core::interpreter;
 use crate::core::jobmanager::JobManager;
 use crate::core::parser;
 use log::debug;
@@ -109,12 +109,12 @@ impl Parallel {
         };
 
         // now that the command has been parse, we give the result to create jobs
-        match interpretor::interpret(&mut self.job_manager, &mut result) {
+        match interpreter::interpret(&mut self.job_manager, &mut result) {
             Err(error) => {
                 match error {
-                    interpretor::InterpretError::Help => (),
-                    interpretor::InterpretError::NoData(string) => eprintln!("{}", string),
-                    interpretor::InterpretError::BothSourceAndRemote(string) => {
+                    interpreter::InterpretError::Help => (),
+                    interpreter::InterpretError::NoData(string) => eprintln!("{}", string),
+                    interpreter::InterpretError::BothSourceAndRemote(string) => {
                         eprintln!("{}", string)
                     }
                 }
