@@ -7,13 +7,20 @@ rust_parallel [options] [command [arguments | {[n]}]] ::: values
 rust_parallel --server PORT
         
 ## Options list
-+ --help                  display this message
-+ --dry-run               display the jobs without executing them
-+ --server PORT           launch as a remote executor machine listening on PORT
-+ --client IP_DST PORT    launch all the jobs remotly on machine IP_DST:PORT
-+ --keep-order            allow to display the returns of the commands in the execution order given in input
-+ --jobs NB / -j NB       the number of threads (NB) to be used (0 = unlimited)
-+ --pipe                  is not yet implemented
++ `--help`
+    - display help message
++ `--dry-run`             
+    - display the jobs without executing them
++ `--server PORT`           
+    - launch as a remote executor machine listening on PORT
++ `--client IP_DST PORT`    
+    - launch all the jobs remotly on machine IP_DST:PORT
++ `--keep-order`            
+    - display the output of the commands in the execution order given in input
++ `--jobs NB` / `-j NB`       
+    - the number of threads (NB) to be used (0 = unlimited)
++ `--pipe`                  
+    - is not yet implemented
 
 
 ## Example

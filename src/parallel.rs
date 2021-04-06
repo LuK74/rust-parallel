@@ -77,7 +77,7 @@ impl Parallel {
         println!("\tlaunch all the jobs remotly on machine IP_DST:PORT");
 
         print!("\t--keep-order ");
-        println!("\t\tallow to display the returns of the commands in the execution order given in input");
+        println!("\t\tdisplay the output of the commands in the execution order given in input");
 
         print!("\t--jobs NB / -j NB");
         println!("\tthe number of threads (NB) to be used (0 = unlimited)");
