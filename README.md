@@ -25,4 +25,6 @@ rust_parallel --server PORT
 
 ## Example
 + parallel echo ::: a b c ::: 1 2 3
-+ parallel echo {2} {1}::: a b c ::: 1 2 3Z
++ parallel echo {2} {1}::: a b c ::: 1 2 3
+
+You can find a **demo** folder with many scripts to test our solution.
