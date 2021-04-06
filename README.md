@@ -1,37 +1,21 @@
 # RUST PARALLEL
 
 ## Client Usage
-rust_parallel [options] [command [arguments | {} | {}]] (:::+ arguments)
+rust_parallel [options] [command [arguments | {[n]}]] ::: values
 
 ## Server Usage
-rust_parallel -p PORT
-
-:warning: is not yet implemented
+rust_parallel --server PORT
         
-## Options
-    --help
-    -h
-        To get more information
-    
-
-    --dry-run
-        Allow to display the commands without executing them
-
-    --keep-order
-        Allow to display the returns of the commands in the execution order given in input
-
-    --jobs NB
-    -j NB
-        the number of threads (NB) to be used in the execution environment
-
-    --pipe
-        :warning: is not yet implemented
-
-    --server X.X.X.X:PORT
-    -s X.X.X.X:PORT
-        :warning: is not yet implemented
+## Options list
++ --help                  display this message
++ --dry-run               display the jobs without executing them
++ --server PORT           launch as a remote executor machine listening on PORT
++ --client IP_DST PORT    launch all the jobs remotly on machine IP_DST:PORT
++ --keep-order            allow to display the returns of the commands in the execution order given in input
++ --jobs NB / -j NB       the number of threads (NB) to be used (0 = unlimited)
++ --pipe                  is not yet implemented
 
 
 ## Example
-    parallel echo ::: a b c ::: 1 2 3
-    println!("\tparallel echo {0} {1}::: a b c ::: 1 2 3
++ parallel echo ::: a b c ::: 1 2 3
++ parallel echo {2} {1}::: a b c ::: 1 2 3Z
