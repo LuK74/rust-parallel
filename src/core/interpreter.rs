@@ -1,8 +1,8 @@
 /////////////////////////////////////////////////////////////////////////////////////
-use super::job::Job;
 /// Disclaimer : this file works very closely with the grammar of rust-parallel,  ///
 /// if the grammar changes the code below should be maintained accordingly.       ///
 /////////////////////////////////////////////////////////////////////////////////////
+use super::job::Job;
 use super::jobmanager::JobManager;
 
 // To see the avaible Rules & Pairs from the grammar:
@@ -22,56 +22,28 @@ pub enum InterpretError {
 ///
 /// ## PARAMS
 /// - `builds`: the list containing all separators combinations
-/// - `sep_ord`: vector of separators' order according to the number of elements
-/// - `depth`: the depth in sep_ord (up to sep_val.len() - 1)
+/// - `sep_number`: current index of sep_val
 /// - `sep_val`: contains all the values of each separator
 /// - `curr_build`: the current building combination of values
 fn build_combinations<'a>(
     builds: &mut Vec<Vec<&'a str>>,
-    sep_ord: &Vec<usize>,
-    depth: usize,
+    sep_number: usize,
     sep_val: &Vec<Vec<&'a str>>,
     curr_build: Vec<&'a str>,
 ) {
-    for i_value in 0..sep_val[sep_ord[depth]].len() {
+    for i_value in 0..sep_val[sep_number].len() {
         let mut build = curr_build.clone();
-        let value = sep_val[sep_ord[depth]][i_value];
+        let value = sep_val[sep_number][i_value];
         build.push(value);
-        if depth == sep_ord.len() - 1 {
+        if sep_number == sep_val.len() - 1 {
             // we are at the smallest separator here
             //the iteration stops here (no recursive call)
             builds.push(build); // we had the final combination.
         } else {
             //recursive call here
-            build_combinations(builds, sep_ord, depth + 1, sep_val, build);
+            build_combinations(builds, sep_number + 1, sep_val, build);
         }
     }
-}
-
-/// returned vector will contain the indexes of the vectors inside the given "vector"
-/// classified from the longest vector to the smalest vector according to their sizes
-fn orderly_sorter(vector: &Vec<Vec<&str>>) -> Vec<usize> {
-    struct IndexAndValue {
-        i: usize, //index
-        v: usize, //value
-    }
-
-    let mut orderly_indexes = Vec::with_capacity(vector.len()); // contains the orderly indexes
-    let mut max = IndexAndValue { i: 0, v: 0 }; // the current max observed value at some index
-
-    for _ /*discard value*/ in 0..vector.len() {
-        for (index, vec) in vector.iter().enumerate() {
-            let len = vec.len();
-            if max.v < len && !orderly_indexes.contains(&index) {
-                max.i = index;
-                max.v = len;
-            }
-        }
-        orderly_indexes.push(max.i);
-        max = IndexAndValue{i: 0, v: 0}
-    }
-
-    orderly_indexes
 }
 
 pub fn interpret(job_man: &mut JobManager, inputs: &mut Pairs<Rule>) -> Result<(), InterpretError> {
@@ -151,15 +123,10 @@ pub fn interpret(job_man: &mut JobManager, inputs: &mut Pairs<Rule>) -> Result<(
     // TODO : add pipe input in separators values.
 
     if separators.len() > 0 {
-        // to properly imbricate the loops that will be used to create
-        // all the possible combinations, we must sort a vector to know
-        // which separator to look first, then second, and so on ...
-        let vec_ordered = orderly_sorter(&separators);
-
         // a vector that will contain all possible combinations
         let mut combinations: Vec<Vec<&str>> = Vec::new();
         // build all possible combinations from separators values
-        build_combinations(&mut combinations, &vec_ordered, 0, &separators, Vec::new());
+        build_combinations(&mut combinations, 0, &separators, Vec::new());
 
         // Create all jobs here from the command's pattern
         create_all_jobs(job_man, &combinations, command_pattern);
@@ -258,23 +225,6 @@ fn create_all_jobs(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn orderer_test() {
-        let _ = env_logger::builder().is_test(true).try_init();
-        let mut vec_main = Vec::new();
-        vec_main.push(vec!["hi", "hi", "hi"]);
-        vec_main.push(vec!["hi"]);
-        vec_main.push(vec!["hi", "hi", "hi"]);
-        vec_main.push(vec!["hi", "hi"]);
-        vec_main.push(vec!["hi", "hi", "hi", "hi", "hi"]);
-        let order_vector = orderly_sorter(&vec_main);
-        assert_eq!(order_vector[0], 4);
-        assert_eq!(order_vector[1], 0);
-        assert_eq!(order_vector[2], 2);
-        assert_eq!(order_vector[3], 3);
-        assert_eq!(order_vector[4], 1);
-    }
 
     #[test]
     fn builder_test1() {
