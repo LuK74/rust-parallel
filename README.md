@@ -27,4 +27,4 @@ rust_parallel --server PORT
 + parallel echo ::: a b c ::: 1 2 3
 + parallel echo {2} {1}::: a b c ::: 1 2 3
 
-You can find a **demo** folder with many scripts to test our solution.
+You can find a [**demo**](demo/demo.md) folder with many scripts to test our solution.
